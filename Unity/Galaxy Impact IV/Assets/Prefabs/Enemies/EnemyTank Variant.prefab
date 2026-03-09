@@ -1,0 +1,127 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &6767558625276463280
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 848928328293391054, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: enemyType
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 848928328293391054, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: moveSpeed
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 848928328293391054, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: contactDamage
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 1754694501609695684, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Size.x
+      value: 6.983293
+      objectReference: {fileID: 0}
+    - target: {fileID: 1754694501609695684, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Size.y
+      value: 6.440098
+      objectReference: {fileID: 0}
+    - target: {fileID: 1754694501609695684, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Offset.x
+      value: 0.117670864
+      objectReference: {fileID: 0}
+    - target: {fileID: 1754694501609695684, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Offset.y
+      value: -0.000000013845921
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 0.317775
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalScale.y
+      value: 0.32194144
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.07132843
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -4.6992884
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3500441943167668692, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4523111916344981210, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Size.x
+      value: 7.97
+      objectReference: {fileID: 0}
+    - target: {fileID: 4523111916344981210, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Size.y
+      value: 7.37
+      objectReference: {fileID: 0}
+    - target: {fileID: 4523111916344981210, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: -5133412329262697850, guid: 5ff35ca542540864b801ebb18998440b, type: 3}
+    - target: {fileID: 4523111916344981210, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Color.b
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4523111916344981210, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Color.g
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4523111916344981210, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Color.r
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4523111916344981210, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_WasSpriteAssigned
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 6294728344263907713, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: m_Name
+      value: EnemyTank Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 7106343360093263309, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: maxHealth
+      value: 60
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: fb384aa801d8b7043806eb080b83da03, type: 3}

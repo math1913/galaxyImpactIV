@@ -1,0 +1,28 @@
+using UnityEngine;
+
+[RequireComponent(typeof(AutoScaleBackground))]
+public class BackgroundColliderSync : MonoBehaviour
+{
+    private Vector3 lastScale;
+
+    void Start()
+    {
+        lastScale = transform.localScale;
+    }
+
+    void Update()
+    {
+        // Si la escala cambió (porque AutoScaleBackground la ajustó)
+        if (transform.localScale != lastScale)
+        {
+            // Reinicia los colliders de los hijos
+            foreach (var col in GetComponentsInChildren<Collider2D>())
+            {
+                col.enabled = false;
+                col.enabled = true;
+            }
+
+            lastScale = transform.localScale;
+        }
+    }
+}
