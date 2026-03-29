@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Events;
 using Pathfinding;
+using Unity.Netcode;
 
 [System.Serializable]
 public class PickupEntry
@@ -174,6 +175,9 @@ public class WaveManager : MonoBehaviour
 
     private void Start()
     {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
         if (difficulty == null)
             difficulty = Resources.Load<DifficultyProfile>("Difficulty/MediumProfile");
 
@@ -186,14 +190,14 @@ public class WaveManager : MonoBehaviour
         Debug.Log(AudioListener.volume);
         Debug.Log(AudioListener.pause);
         if (!player)
-            player = GameObject.FindGameObjectWithTag("Player")?.transform;
+            player = LanPlayerAvatar.GetClosestPlayerTransform(Vector3.zero) ?? GameObject.FindGameObjectWithTag("Player")?.transform;
         if (!minimap)
             minimap = GameObject.FindGameObjectWithTag("Minimap")?.GetComponent<MinimapController>();
 
 
         if (minKillsForPickup < 1) minKillsForPickup = 1;
         if (maxKillsForPickup < minKillsForPickup) maxKillsForPickup = minKillsForPickup;
-        if (GameStatsManager.Instance != null)
+        if (!LanRuntime.IsActive && GameStatsManager.Instance != null)
             OnWaveCompleted.AddListener(GameStatsManager.Instance.OnWaveCompleted);
         ResetPickupKillThreshold();
 
@@ -205,6 +209,9 @@ public class WaveManager : MonoBehaviour
         for (int i = 1; i <= totalWaves; i++)
         {
             currentWave = i;
+            if (LanRuntime.IsActive)
+                LanPlayerAvatar.ServerSetCurrentWave(currentWave);
+
             OnWaveStarted?.Invoke(currentWave);
             if (playWaveStartSfx && waveStartSfx != null)
             {
@@ -215,7 +222,18 @@ public class WaveManager : MonoBehaviour
                     AudioSource.PlayClipAtPoint(waveStartSfx, Vector3.zero, waveStartSfxVolume);
             }
             // Reset dash charges al inicio de cada oleada
-            if (player != null)
+            if (LanRuntime.IsActive)
+            {
+                foreach (var lanPlayer in LanPlayerAvatar.ActivePlayers)
+                {
+                    if (lanPlayer == null) continue;
+
+                    var dash = lanPlayer.GetComponent<DashChargesEffect>();
+                    if (dash != null)
+                        dash.ResetChargesToFull();
+                }
+            }
+            else if (player != null)
             {
                 var dash = player.GetComponent<DashChargesEffect>();
                 if (dash != null)
@@ -247,6 +265,8 @@ public class WaveManager : MonoBehaviour
             yield return new WaitUntil(() => enemiesAlive <= 0);
 
             OnWaveCompleted?.Invoke(currentWave);
+            if (LanRuntime.IsActive)
+                LanPlayerAvatar.ServerRecordWaveCompleted(currentWave);
 
             if (spawnPickupsOnWaveEnd)
                 SpawnPickupsForWave();
@@ -321,7 +341,8 @@ public class WaveManager : MonoBehaviour
             }
 
             GameObject enemy = Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
-            minimap?.RegisterEnemy(enemy.transform);
+            if (LanRuntime.IsServer && enemy.TryGetComponent<NetworkObject>(out var networkObject) && !networkObject.IsSpawned)
+                networkObject.Spawn(true);
 
             // Contador por tipo
             if (!enemySpawnCount.ContainsKey(chosen))
@@ -337,7 +358,7 @@ public class WaveManager : MonoBehaviour
             // Enemigo apunta al jugador
             var setter = enemy.GetComponent<AIDestinationSetter>();
             if (setter != null)
-                setter.target = player;
+                setter.target = LanRuntime.IsActive ? LanPlayerAvatar.GetClosestPlayerTransform(enemy.transform.position) : player;
 
             // Ajuste de dificultad y suscripción a la muerte
             if (enemy.TryGetComponent<EnemyController>(out var ec))
@@ -347,12 +368,9 @@ public class WaveManager : MonoBehaviour
                 
                 ec.SetDifficultyMultiplier(baseMultiplier);
 
-                Transform enemyTransform = enemy.transform;
-
                 ec.OnDeath.AddListener(() =>
                 {
-                    minimap?.UnregisterEnemy(enemyTransform);
-                    HandleEnemyDeath(enemyTransform.position);
+                    HandleEnemyDeath(enemy.transform.position);
                 });
             }
             // Pequeño delay entre spawns
@@ -463,7 +481,9 @@ public class WaveManager : MonoBehaviour
         float radius = 0.4f + spawnPadding;
         Vector3 goodPos = GetValidSpawn2D(deathPosition, radius);
 
-        Instantiate(chosen.prefab, goodPos, Quaternion.identity);
+        GameObject pickup = Instantiate(chosen.prefab, goodPos, Quaternion.identity);
+        if (LanRuntime.IsServer && pickup.TryGetComponent<NetworkObject>(out var networkObject) && !networkObject.IsSpawned)
+            networkObject.Spawn(true);
     }
 
     /// Elige un pickup usando spawnChance como peso, filtrando por minWave y prefab válido.
@@ -523,7 +543,9 @@ public class WaveManager : MonoBehaviour
                 Vector3 pos = Vector3.zero + new Vector3(dir.x, dir.y, 0) * dist;
 
                 Vector3 goodPos = GetValidSpawn2D(pos, 0.4f);
-                Instantiate(entry.prefab, goodPos, Quaternion.identity);
+                GameObject pickup = Instantiate(entry.prefab, goodPos, Quaternion.identity);
+                if (LanRuntime.IsServer && pickup.TryGetComponent<NetworkObject>(out var networkObject) && !networkObject.IsSpawned)
+                    networkObject.Spawn(true);
             }
         }
     }
@@ -549,6 +571,20 @@ public class WaveManager : MonoBehaviour
         {
             StopCoroutine(waveRoutine);
             waveRoutine = null;
+        }
+    }
+
+    public void ApplyNetworkWaveStarted(int wave)
+    {
+        currentWave = Mathf.Max(0, wave);
+        OnWaveStarted?.Invoke(currentWave);
+
+        if (playWaveStartSfx && waveStartSfx != null)
+        {
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlaySFX(waveStartSfx, waveStartSfxVolume);
+            else
+                AudioSource.PlayClipAtPoint(waveStartSfx, Vector3.zero, waveStartSfxVolume);
         }
     }
 

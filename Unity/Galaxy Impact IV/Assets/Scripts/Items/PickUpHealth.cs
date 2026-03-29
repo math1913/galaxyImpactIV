@@ -8,5 +8,8 @@ public class PickupHealth : PickupBase
     {
         if (player.TryGetComponent<Health>(out var hp))
             hp.Heal(healAmount);
+
+        if (LanRuntime.IsActive && player.TryGetComponent(out LanPlayerAvatar lanPlayer))
+            LanPlayerAvatar.ServerRecordPickup(lanPlayer.OwnerClientId, LanPickupType.Health);
     }
 }

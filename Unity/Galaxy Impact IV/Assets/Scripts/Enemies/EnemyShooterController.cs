@@ -17,18 +17,21 @@ public class EnemyShooterController : MonoBehaviour
     {
         destSetter = GetComponent<AIDestinationSetter>();
 
-        // Si estás usando los flags en Weapon:
+        // Si estÃ¡s usando los flags en Weapon:
         if (weapon != null)
         {
-            weapon.automaticFire = true; // si añadiste este campo
-            weapon.autoReload   = true;  // idem
+            weapon.automaticFire = true; // si aÃ±adiste este campo
+            weapon.autoReload = true;    // idem
         }
     }
 
     private void Update()
     {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
         if (weapon == null || destSetter == null) return;
-        if (destSetter.target == null) return; // aún no lo puso EnemySetup
+        if (destSetter.target == null) return; // aÃºn no lo puso EnemySetup
 
         timer -= Time.deltaTime;
 
@@ -44,7 +47,7 @@ public class EnemyShooterController : MonoBehaviour
             // Debug.Log($"{name} dispara (distancia {dist})");
         }
 
-        // Recarga automática (si la tienes en Weapon)
+        // Recarga automÃ¡tica (si la tienes en Weapon)
         if (weapon.autoReload && weapon.CurrentAmmo <= 0 && !weapon.IsReloading)
         {
             weapon.Reload();

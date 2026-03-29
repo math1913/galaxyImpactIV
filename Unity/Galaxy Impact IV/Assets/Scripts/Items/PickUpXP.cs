@@ -6,6 +6,12 @@ public class PickupXP : PickupBase
 
     protected override void OnPickup(Collider2D player)
     {
+        if (LanRuntime.IsActive && player.TryGetComponent(out LanPlayerAvatar lanPlayer))
+        {
+            LanPlayerAvatar.ServerRecordPickup(lanPlayer.OwnerClientId, LanPickupType.Exp, xpAmount);
+            return;
+        }
+
         if (GameStatsManager.Instance != null)
         {
             GameStatsManager.Instance.AddXP(xpAmount);

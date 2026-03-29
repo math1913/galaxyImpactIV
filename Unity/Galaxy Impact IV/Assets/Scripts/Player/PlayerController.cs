@@ -1,6 +1,7 @@
+using Unity.Netcode;
 using UnityEngine;
 
-/// Movimiento top-down + rotación hacia el mouse.
+/// Movimiento top-down + rotaciÃ³n hacia el mouse.
 /// Requiere Rigidbody2D.
 [RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : MonoBehaviour
@@ -27,12 +28,21 @@ public class PlayerController : MonoBehaviour
     private Vector2 minBounds;
     private Vector2 maxBounds;
     private bool _overrideVelocityActive = false;
-    private Vector2 _overrideVelocity;  
+    private Vector2 _overrideVelocity;
+    private bool _useExternalInput = false;
+    private Vector2 _externalMoveInput;
+    private Vector3 _externalAimWorld;
 
     private void Awake()
     {
+        if (LanRuntime.IsActive && GetComponent<NetworkObject>() == null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         _rb = GetComponent<Rigidbody2D>();
-        if (!cam) 
+        if (!cam)
             cam = Camera.main;
         if (GetComponent<BuffManager>() == null)
             gameObject.AddComponent<BuffManager>();
@@ -40,33 +50,53 @@ public class PlayerController : MonoBehaviour
 
     private void Start()
     {
+        if (background == null)
+            background = GameObject.Find("Background")?.GetComponent<SpriteRenderer>();
+
         if (background != null)
             UpdateBounds();
     }
 
     private void Update()
     {
+        if (LanRuntime.IsClientReplica(gameObject))
+            return;
+
+        if (_useExternalInput)
+        {
+            _moveInput = _externalMoveInput;
+            RotateTowards(_externalAimWorld);
+            return;
+        }
+
         // Movimiento (WASD)
         _moveInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
 
-        // Rotación hacia el cursor
+        // RotaciÃ³n hacia el cursor
+        if (cam == null)
+            cam = Camera.main;
+
+        if (cam == null)
+            return;
+
         Vector3 mouseWorld = cam.ScreenToWorldPoint(Input.mousePosition);
-        Vector2 dir = (mouseWorld - transform.position);
-        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        _rb.SetRotation(angle);
+        RotateTowards(mouseWorld);
     }
 
     private void FixedUpdate()
     {
+        if (LanRuntime.IsClientReplica(gameObject))
+            return;
+
         if (_overrideVelocityActive)
         {
             _rb.linearVelocity = _overrideVelocity;
             return;
         }
 
-        Vector2 targetVelocity =  _moveInput * (moveSpeed * speedMultiplier);
+        Vector2 targetVelocity = _moveInput * (moveSpeed * speedMultiplier);
 
-        // Interpolación entre aceleración y frenado
+        // InterpolaciÃ³n entre aceleraciÃ³n y frenado
         float rate = (targetVelocity.magnitude > _rb.linearVelocity.magnitude) ? acceleration : deceleration;
 
         _currentVelocity = Vector2.MoveTowards(_rb.linearVelocity, targetVelocity, rate * Time.fixedDeltaTime);
@@ -75,9 +105,12 @@ public class PlayerController : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (LanRuntime.IsClientReplica(gameObject))
+            return;
+
         if (background == null) return;
 
-        // Limitar la posición del jugador dentro del fondo
+        // Limitar la posiciÃ³n del jugador dentro del fondo
         Vector3 pos = transform.position;
 
         pos.x = Mathf.Clamp(pos.x, minBounds.x + margin, maxBounds.x - margin);
@@ -88,7 +121,7 @@ public class PlayerController : MonoBehaviour
 
     private void UpdateBounds()
     {
-        Bounds bgBounds = background.bounds; // límites reales del sprite en el mundo
+        Bounds bgBounds = background.bounds; // lÃ­mites reales del sprite en el mundo
         minBounds = bgBounds.min;
         maxBounds = bgBounds.max;
     }
@@ -103,8 +136,9 @@ public class PlayerController : MonoBehaviour
         float towardEnemy = Vector2.Dot(_rb.linearVelocity, toEnemy);
         if (towardEnemy > 0f)
             _rb.linearVelocity -= toEnemy * towardEnemy;
-        Debug.Log("Chocó con: " + collision.gameObject.name);
+        Debug.Log("ChocÃ³ con: " + collision.gameObject.name);
     }
+
     public void MultiplySpeed(float multiplier)
     {
         speedMultiplier *= multiplier;
@@ -113,18 +147,41 @@ public class PlayerController : MonoBehaviour
     public void DivideSpeed(float multiplier)
     {
         if (Mathf.Approximately(multiplier, 0f)) return;
-            speedMultiplier /= multiplier;
+        speedMultiplier /= multiplier;
     }
+
     public void SetOverrideVelocity(Vector2 velocity)
     {
         _overrideVelocityActive = true;
         _overrideVelocity = velocity;
     }
-
+ 
     public void ClearOverrideVelocity()
     {
         _overrideVelocityActive = false;
         _overrideVelocity = Vector2.zero;
     }
 
+    public void SetExternalInput(Vector2 moveInput, Vector3 aimWorld)
+    {
+        _useExternalInput = true;
+        _externalMoveInput = moveInput;
+        _externalAimWorld = aimWorld;
+    }
+
+    public void DisableExternalInput()
+    {
+        _useExternalInput = false;
+        _externalMoveInput = Vector2.zero;
+    }
+
+    private void RotateTowards(Vector3 worldTarget)
+    {
+        Vector2 dir = worldTarget - transform.position;
+        if (dir.sqrMagnitude < 0.0001f)
+            return;
+
+        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        _rb.SetRotation(angle);
+    }
 }
