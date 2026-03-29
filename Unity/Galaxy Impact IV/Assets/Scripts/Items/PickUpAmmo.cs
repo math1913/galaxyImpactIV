@@ -12,6 +12,8 @@ public class PickupAmmo : PickupBase
         {
             Debug.Log($"Recogió munición + {ammoAmount}");
             weapon.AddAmmo(ammoAmount);
+            if (LanRuntime.IsActive && player.TryGetComponent(out LanPlayerAvatar lanPlayer))
+                LanPlayerAvatar.ServerRecordPickup(lanPlayer.OwnerClientId, LanPickupType.Ammo);
         }
     }
 }

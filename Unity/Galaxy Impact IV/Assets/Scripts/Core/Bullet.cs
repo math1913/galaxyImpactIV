@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 /// Proyectil simple que avanza en +X local, daña y tiene TTL.
@@ -7,99 +8,137 @@ public class Bullet : MonoBehaviour
     [SerializeField] private float speed = 18f;
     [SerializeField] private int damage = 10;
     [SerializeField] private float lifeTime = 2f;
-    [SerializeField] private LayerMask hitMask; // Enemigos / Obstáculos
+    [SerializeField] private LayerMask hitMask;
 
-    private float t;
+    private float elapsed;
+    private float runtimeLifeTime;
     private ObjectPool pool;
-    private bool hasRuntimeDamage = false;
-    private int runtimeDamage = 0;
+    private bool hasRuntimeDamage;
+    private int runtimeDamage;
+    private bool cosmeticOnly;
+    private bool shotEndReported;
 
-    // Ignite
-    private bool igniteOnHit = false;
+    private bool igniteOnHit;
     private int igniteDamagePerTick = 1;
     private float igniteDuration = 2f;
     private float igniteTickInterval = 0.5f;
 
-    // Piercing fan
-    private bool fanOnHit = false;
+    private bool fanOnHit;
     private float fanAngleDeg = 60f;
     private float fanSpawnOffset = 0.15f;
     private bool allowFanSpawn = true;
 
-    // Owner (para spawnear balas extra sin consumir ammo)
-    private Weapon ownerWeapon = null;
+    private Weapon ownerWeapon;
+    private ulong shotOwnerClientId = ulong.MaxValue;
+    private uint shotId;
+    private bool notifyShotEnd;
 
-    // Exponer el damage “base” del prefab (para que Weapon calcule el final)
+    private Collider2D[] colliders;
+    private bool[] colliderDefaults;
+
     public int DefaultDamage => damage;
+    public float BaseLifeTime => lifeTime;
 
+    private void Awake()
+    {
+        colliders = GetComponents<Collider2D>();
+        colliderDefaults = new bool[colliders.Length];
+        for (int i = 0; i < colliders.Length; i++)
+            colliderDefaults[i] = colliders[i] != null && colliders[i].enabled;
+    }
 
-    public void Init(ObjectPool p) => pool = p;
+    public void Init(ObjectPool p)
+    {
+        pool = p;
+    }
 
     private void OnEnable()
     {
-        t = 0f;
-
+        elapsed = 0f;
+        runtimeLifeTime = lifeTime;
         hasRuntimeDamage = false;
         runtimeDamage = 0;
+        cosmeticOnly = false;
+        shotEndReported = false;
+        shotOwnerClientId = ulong.MaxValue;
+        shotId = 0;
+        notifyShotEnd = false;
 
         igniteOnHit = false;
-
         fanOnHit = false;
         allowFanSpawn = true;
-
         ownerWeapon = null;
-    }
 
+        RestoreColliderState();
+    }
 
     private void Update()
     {
+        if (!ShouldSimulateLocally())
+            return;
+
         transform.position += transform.right * (speed * Time.deltaTime);
-        t += Time.deltaTime;
-        if (t >= lifeTime) Despawn();
+        elapsed += Time.deltaTime;
+
+        if (elapsed >= runtimeLifeTime)
+            Despawn(transform.position);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        Debug.Log("Bala chocó con: " + other.name + " Layer: " + LayerMask.LayerToName(other.gameObject.layer));
+        if (!ShouldProcessCollision(other))
+            return;
 
-        // Filtra por máscara
-        if (((1 << other.gameObject.layer) & hitMask) == 0) return;
+        Vector3 impactPosition = other.ClosestPoint(transform.position);
 
         if (other.TryGetComponent<Health>(out var hp))
         {
-            hp.TakeDamage(GetCurrentDamage());
+            hp.TakeDamage(GetCurrentDamage(), shotOwnerClientId);
 
-            // Ignite: agrega/refresh un DOT en el enemigo
             if (igniteOnHit && igniteDamagePerTick > 0 && igniteDuration > 0f)
             {
                 var ignite = other.GetComponent<IgniteStatus>();
-                if (ignite == null) ignite = other.gameObject.AddComponent<IgniteStatus>();
+                if (ignite == null)
+                    ignite = other.gameObject.AddComponent<IgniteStatus>();
+
                 ignite.Apply(hp, igniteDamagePerTick, igniteTickInterval, igniteDuration);
             }
 
-            // Piercing fan: 3 balas a -60, 0, +60 (spread 60°) en dirección del disparo
             if (fanOnHit && ownerWeapon != null)
             {
-                // Punto de impacto aproximado
-                Vector3 hitPoint = other.ClosestPoint(transform.position);
-
                 float baseAngle = transform.eulerAngles.z;
-                Vector3 spawnPos = hitPoint + transform.right * fanSpawnOffset;
+                Vector3 spawnPos = impactPosition + transform.right * fanSpawnOffset;
 
                 ownerWeapon.SpawnExtraBullet(spawnPos, Quaternion.Euler(0f, 0f, baseAngle - fanAngleDeg), allowFanSpawn: false);
-                ownerWeapon.SpawnExtraBullet(spawnPos, Quaternion.Euler(0f, 0f, baseAngle),             allowFanSpawn: false);
+                ownerWeapon.SpawnExtraBullet(spawnPos, Quaternion.Euler(0f, 0f, baseAngle), allowFanSpawn: false);
                 ownerWeapon.SpawnExtraBullet(spawnPos, Quaternion.Euler(0f, 0f, baseAngle + fanAngleDeg), allowFanSpawn: false);
             }
         }
-        Despawn();
+
+        Despawn(impactPosition);
     }
 
-    private void Despawn()
+    public void ConfigureCosmetic(float maxLifeTime)
     {
-        if (pool) pool.Return(gameObject);
-        else gameObject.SetActive(false);
+        cosmeticOnly = true;
+        runtimeLifeTime = Mathf.Max(0.05f, maxLifeTime);
+        SetCollidersEnabled(false);
     }
-    public void SetOwnerWeapon(Weapon w) => ownerWeapon = w;
+
+    public void SnapTo(Vector3 position)
+    {
+        transform.position = position;
+    }
+
+    public void ForceDespawn()
+    {
+        Despawn(transform.position, forced: true);
+    }
+
+    public void SetOwnerWeapon(Weapon weapon)
+    {
+        ownerWeapon = weapon;
+    }
 
     public void SetDamage(int newDamage)
     {
@@ -123,6 +162,98 @@ public class Bullet : MonoBehaviour
         fanSpawnOffset = Mathf.Max(0f, spawnOffset);
     }
 
-    private int GetCurrentDamage() => hasRuntimeDamage ? runtimeDamage : damage;
+    public void SetShotContext(ulong ownerClientId, uint shotSequence, bool shouldNotifyShotEnd)
+    {
+        shotOwnerClientId = ownerClientId;
+        shotId = shotSequence;
+        notifyShotEnd = shouldNotifyShotEnd;
+        shotEndReported = false;
+    }
 
+    private bool ShouldSimulateLocally()
+    {
+        if (cosmeticOnly)
+            return true;
+
+        if (!LanRuntime.IsActive)
+            return true;
+
+        if (!TryGetComponent<NetworkObject>(out var networkObject))
+            return true;
+
+        return !networkObject.IsSpawned || LanRuntime.IsServer;
+    }
+
+    private bool ShouldProcessCollision(Collider2D other)
+    {
+        if (cosmeticOnly)
+            return false;
+
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return false;
+
+        return ((1 << other.gameObject.layer) & hitMask) != 0;
+    }
+
+    private void RestoreColliderState()
+    {
+        if (colliders == null)
+            return;
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+                colliders[i].enabled = colliderDefaults[i];
+        }
+    }
+
+    private void SetCollidersEnabled(bool enabled)
+    {
+        if (colliders == null)
+            return;
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+                colliders[i].enabled = enabled;
+        }
+    }
+
+    private void Despawn(Vector3 endPosition, bool forced = false)
+    {
+        ReportShotEnd(endPosition);
+
+        if (TryGetComponent<NetworkObject>(out var networkObject) && networkObject.IsSpawned)
+        {
+            if (LanRuntime.IsServer)
+                networkObject.Despawn(true);
+
+            return;
+        }
+
+        if (pool != null && !cosmeticOnly)
+        {
+            pool.Return(gameObject);
+            return;
+        }
+
+        if (forced || Application.isPlaying)
+            Destroy(gameObject);
+        else
+            gameObject.SetActive(false);
+    }
+
+    private void ReportShotEnd(Vector3 endPosition)
+    {
+        if (shotEndReported || !notifyShotEnd || shotOwnerClientId == ulong.MaxValue || !LanRuntime.IsServer)
+            return;
+
+        shotEndReported = true;
+        LanPlayerAvatar.ServerResolvePlayerShot(shotOwnerClientId, shotId, endPosition);
+    }
+
+    private int GetCurrentDamage()
+    {
+        return hasRuntimeDamage ? runtimeDamage : damage;
+    }
 }

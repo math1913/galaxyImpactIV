@@ -55,4 +55,9 @@ public class CameraFollow2D : MonoBehaviour
             Gizmos.DrawWireCube(background.bounds.center, background.bounds.size);
         }
     }
+
+    public void BindPlayer(Transform target)
+    {
+        player = target;
+    }
 }

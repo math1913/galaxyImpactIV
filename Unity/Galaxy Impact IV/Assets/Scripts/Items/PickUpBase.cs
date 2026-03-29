@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public abstract class PickupBase : MonoBehaviour
@@ -20,10 +21,40 @@ public abstract class PickupBase : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
         if (!other.CompareTag("Player")) return;
         OnPickup(other);
-        if (pickupSound) AudioSource.PlayClipAtPoint(pickupSound, transform.position);
-        Destroy(gameObject);
+
+        if (pickupSound != null)
+        {
+            if (LanRuntime.IsActive
+                && other.TryGetComponent(out LanPlayerAvatar lanPlayer)
+                && TryGetComponent(out NetworkObject pickupNetworkObject)
+                && pickupNetworkObject.IsSpawned)
+            {
+                if (lanPlayer.OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId)
+                    PlayPickupFeedbackLocal();
+                else
+                    LanPlayerAvatar.ServerPlayPickupFeedback(lanPlayer.OwnerClientId, pickupNetworkObject.NetworkObjectId);
+            }
+            else
+            {
+                PlayPickupFeedbackLocal();
+            }
+        }
+
+        if (TryGetComponent<NetworkObject>(out var networkObject) && networkObject.IsSpawned)
+            networkObject.Despawn(true);
+        else
+            Destroy(gameObject);
+    }
+
+    public void PlayPickupFeedbackLocal()
+    {
+        if (pickupSound != null)
+            AudioSource.PlayClipAtPoint(pickupSound, transform.position);
     }
 
     protected abstract void OnPickup(Collider2D player);

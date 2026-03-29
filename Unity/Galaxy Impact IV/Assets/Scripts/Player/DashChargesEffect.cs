@@ -1,3 +1,4 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class DashChargesEffect : MonoBehaviour
@@ -25,6 +26,7 @@ public class DashChargesEffect : MonoBehaviour
     private bool isDashing = false;
     private float dashEndTime = 0f;
     private float nextDashTime = 0f;
+    private bool useLocalInput = true;
 
     public int Charges => charges;
     public int MaxCharges => maxCharges;
@@ -39,6 +41,12 @@ public class DashChargesEffect : MonoBehaviour
 
     private void Update()
     {
+        if (LanRuntime.IsClientReplica(gameObject))
+            return;
+
+        if (!useLocalInput)
+            return;
+
         if (charges <= 0) return;
         if (isDashing) return;
         if (Time.time < nextDashTime) return;
@@ -51,6 +59,9 @@ public class DashChargesEffect : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (LanRuntime.IsClientReplica(gameObject))
+            return;
+
         if (!isDashing) return;
 
         if (Time.time >= dashEndTime)
@@ -66,6 +77,33 @@ public class DashChargesEffect : MonoBehaviour
 
         Vector3 mouseWorld = cam.ScreenToWorldPoint(Input.mousePosition);
         mouseWorld.z = 0f;
+
+        StartDashTowards(mouseWorld);
+    }
+
+    public void TryDashTowards(Vector3 mouseWorld)
+    {
+        if (charges <= 0) return;
+        if (isDashing) return;
+        if (Time.time < nextDashTime) return;
+
+        StartDashTowards(mouseWorld);
+    }
+
+    public void SetUseLocalInput(bool value)
+    {
+        useLocalInput = value;
+    }
+
+    public void ApplyStateFromNetwork(int currentCharges, int maxChargesValue)
+    {
+        maxCharges = Mathf.Max(1, maxChargesValue);
+        charges = Mathf.Clamp(currentCharges, 0, maxCharges);
+    }
+
+    private void StartDashTowards(Vector3 mouseWorld)
+    {
+        if (pc == null) return;
 
         Vector2 dir = (mouseWorld - transform.position);
         if (dir.sqrMagnitude < 0.0001f) return;

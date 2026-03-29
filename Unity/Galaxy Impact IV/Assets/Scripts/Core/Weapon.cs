@@ -1,17 +1,18 @@
 using UnityEngine;
 using System.Collections;
 using UnityEngine.Events;
+using Unity.Netcode;
 
 /// Control básico de disparo con recarga y dispersión opcional.
 public class Weapon : MonoBehaviour
 {
     [Header("Refs")]
-    [SerializeField] private Transform muzzle;         // Punto de salida
+    [SerializeField] private Transform muzzle;
     [SerializeField] private GameObject bulletPrefab;
     [SerializeField] private ObjectPool bulletPool;
 
     [Header("Stats")]
-    [SerializeField] private float fireRate = 10f;     // disparos/seg
+    [SerializeField] private float fireRate = 10f;
     [SerializeField] private int magazineSize = 20;
     [SerializeField] private float reloadTime = 1.2f;
     [SerializeField, Range(0f, 8f)] private float spreadDeg = 2f;
@@ -27,153 +28,148 @@ public class Weapon : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float shootVolume = 1f;
     [SerializeField, Range(0f, 1f)] private float reloadVolume = 1f;
 
-
-
     [Header("Ammo (Total)")]
     [Tooltip("Balas en reserva")]
     [SerializeField] private int totalAmmo = 99999999;
-    public int TotalAmmo { get; private set; }   // reserva actual
 
+    public int TotalAmmo { get; private set; }
     public int CurrentAmmo { get; private set; }
     public bool IsReloading { get; private set; }
-    public UnityEvent<int> OnAmmoChanged; // evento (valor actual del cargador)
-    public UnityEvent<int> OnTotalAmmoChanged; // evento (valor actual de la reserva)
-    float cooldown;
+    public float SecondsPerShot => 1f / Mathf.Max(0.01f, fireRate * fireRateMultiplier);
+    public float ProjectileLifeTime => TryGetBulletTemplate(out var bullet) ? bullet.BaseLifeTime : 0.25f;
+    public Transform Muzzle => muzzle != null ? muzzle : transform;
+
+    public UnityEvent<int> OnAmmoChanged;
+    public UnityEvent<int> OnTotalAmmoChanged;
+
+    private float cooldown;
     private float fireRateMultiplier = 1f;
     private float damageMultiplier = 1f;
+    private bool useLocalInput = true;
 
-    // Ignite (config de DOT)
     private bool igniteEnabled = false;
     private int igniteDamagePerTick = 2;
     private float igniteDotDuration = 2.5f;
     private float igniteTickInterval = 0.5f;
 
-    // Piercing fan
     private bool piercingFanEnabled = false;
     [SerializeField] private float fanAngleDeg = 60f;
     [SerializeField] private float fanSpawnOffset = 0.15f;
 
-
     private void Awake()
     {
         CurrentAmmo = magazineSize;
-        TotalAmmo = totalAmmo; // inicializa la reserva con el valor del inspector
+        TotalAmmo = totalAmmo;
 
-        // Actualizar UI si hay listeners
         OnAmmoChanged?.Invoke(CurrentAmmo);
         OnTotalAmmoChanged?.Invoke(TotalAmmo);
     }
 
     private void Update()
     {
-        if (cooldown > 0f) cooldown -= Time.deltaTime;
+        if (LanRuntime.IsClientReplica(gameObject))
+            return;
+
+        if (cooldown > 0f)
+            cooldown -= Time.deltaTime;
+
+        if (!useLocalInput)
+            return;
 
         if (!automaticFire)
         {
-            if (Input.GetButton("Fire1")) TryFire();
-            if (Input.GetKeyDown(KeyCode.R)) Reload();
-        }
-        else
-        {
-            // Modo enemigo: dispara solo si alguien externo lo ordena (TryFire llamado desde otro script)
+            if (Input.GetButton("Fire1"))
+                TryFire();
+
+            if (Input.GetKeyDown(KeyCode.R))
+                Reload();
         }
     }
 
-
-    public void TryFire()
+    public bool CanAttemptShot()
     {
-        if (IsReloading || cooldown > 0f) return;
+        return !IsReloading && cooldown <= 0f && CurrentAmmo > 0;
+    }
 
+    public bool TryGetMuzzleSnapshot(out Vector3 position, out Quaternion rotation)
+    {
+        Transform source = Muzzle;
+        position = source.position;
+        rotation = source.rotation;
+        return source != null;
+    }
+
+    public bool TryFire()
+    {
+        if (!TryGetMuzzleSnapshot(out var position, out var rotation))
+            return false;
+
+        float spreadOffset = Random.Range(-spreadDeg, spreadDeg);
+        return TryFireInternal(position, ApplySpread(rotation, spreadOffset), 0u, false);
+    }
+
+    public bool TryFireWithShotId(uint shotId, Vector3 position, Quaternion rotation)
+    {
+        return TryFireInternal(position, ApplySpread(rotation, ComputeSpreadOffset(shotId)), shotId, true);
+    }
+
+    public Bullet SpawnCosmeticShot(uint shotId, Vector3 position, Quaternion rotation, float maxLifeTime)
+    {
+        if (bulletPrefab == null)
+            return null;
+
+        Quaternion finalRotation = ApplySpread(rotation, ComputeSpreadOffset(shotId));
+        GameObject go = Instantiate(bulletPrefab, position, finalRotation);
+        go.SetActive(true);
+
+        if (!go.TryGetComponent<Bullet>(out var bullet))
+            return null;
+
+        ConfigureBullet(bullet, allowFanSpawn: false);
+        bullet.ConfigureCosmetic(maxLifeTime);
+        bullet.SetShotContext(ulong.MaxValue, shotId, shouldNotifyShotEnd: false);
+        return bullet;
+    }
+
+    public void ApplyPredictedShot()
+    {
         if (CurrentAmmo <= 0)
-        {
-            // SFX de vacío si quieres
             return;
-        }
 
-        Fire();
+        CurrentAmmo--;
+        OnAmmoChanged?.Invoke(CurrentAmmo);
+    }
+
+    public void RevertPredictedShot()
+    {
+        CurrentAmmo = Mathf.Clamp(CurrentAmmo + 1, 0, magazineSize);
+        OnAmmoChanged?.Invoke(CurrentAmmo);
     }
 
     public void Reload()
     {
-        // Si ya está recargando, o cargador lleno, o no hay reserva, no hace nada.
-        if (IsReloading || CurrentAmmo == magazineSize || TotalAmmo <= 0) return;
+        if (IsReloading || CurrentAmmo == magazineSize || TotalAmmo <= 0)
+            return;
+
         IsReloading = true;
-        if (reloadStartSfx != null)
-        {
-            if (AudioManager.Instance != null)
-                AudioManager.Instance.PlaySFX(reloadStartSfx, reloadVolume);
-            else
-                AudioSource.PlayClipAtPoint(reloadStartSfx, transform.position, reloadVolume);
-        }
-        OnAmmoChanged?.Invoke(CurrentAmmo); // Actualizar UI del cargador (opcional)
-        OnTotalAmmoChanged?.Invoke(TotalAmmo); // Actualizar UI de la reserva (opcional)
+        PlayReloadStartSfxLocal();
+
+        OnAmmoChanged?.Invoke(CurrentAmmo);
+        OnTotalAmmoChanged?.Invoke(TotalAmmo);
         StartCoroutine(ReloadRoutine());
     }
+
+    public bool CanReload()
+    {
+        return !IsReloading && CurrentAmmo < magazineSize && TotalAmmo > 0;
+    }
+
     public void AddAmmo(int amount)
     {
         TotalAmmo += amount;
         OnTotalAmmoChanged?.Invoke(TotalAmmo);
     }
 
-    void Fire()
-    {
-        
-        if (shootSfx != null)
-        {
-            if (AudioManager.Instance != null)
-                AudioManager.Instance.PlaySFX(shootSfx, shootVolume);
-            else
-                AudioSource.PlayClipAtPoint(shootSfx, muzzle ? muzzle.position : transform.position, shootVolume);
-        }
-        cooldown = 1f / Mathf.Max(0.01f, fireRate * fireRateMultiplier);
-        CurrentAmmo--;
-
-        // Instanciar / Pool
-        GameObject go = bulletPool ? bulletPool.Get() : Instantiate(bulletPrefab);
-        go.transform.position = muzzle.position;
-        go.transform.rotation = muzzle.rotation * Quaternion.Euler(0, 0, Random.Range(-spreadDeg, spreadDeg));
-        go.SetActive(true);
-
-        if (go.TryGetComponent<Bullet>(out var b))
-        {
-            if (bulletPool) b.Init(bulletPool);
-            ConfigureBullet(b, allowFanSpawn: true);
-        }
-
-        // aualizar UI
-        OnAmmoChanged?.Invoke(CurrentAmmo);
-
-
-    }
-
-    IEnumerator ReloadRoutine()
-    {
-        
-        yield return new WaitForSeconds(reloadTime);
-
-        // Cuántas balas necesita el cargador
-        int needed = magazineSize - CurrentAmmo;
-        // Cuántas balas podemos tomar de la reserva
-        int takeFromReserve = Mathf.Min(needed, TotalAmmo);
-
-        // Rellenar cargador con lo tomado
-        CurrentAmmo += takeFromReserve;
-        TotalAmmo -= takeFromReserve;
-
-        IsReloading = false;
-
-        // Actualizar UI
-        OnAmmoChanged?.Invoke(CurrentAmmo);
-        OnTotalAmmoChanged?.Invoke(TotalAmmo);
-        if (reloadCompleteSfx != null)
-        {
-            if (AudioManager.Instance != null)
-                AudioManager.Instance.PlaySFX(reloadCompleteSfx, reloadVolume);
-            else
-                AudioSource.PlayClipAtPoint(reloadCompleteSfx, transform.position, reloadVolume);
-        }
- 
-    }
     public void MultiplyFireRate(float multiplier)
     {
         fireRateMultiplier *= multiplier;
@@ -182,10 +178,13 @@ public class Weapon : MonoBehaviour
 
     public void DivideFireRate(float multiplier)
     {
-        if (Mathf.Approximately(multiplier, 0f)) return;
+        if (Mathf.Approximately(multiplier, 0f))
+            return;
+
         fireRateMultiplier /= multiplier;
         fireRateMultiplier = Mathf.Clamp(fireRateMultiplier, 0.05f, 100f);
     }
+
     public void MultiplyDamage(float multiplier)
     {
         damageMultiplier *= multiplier;
@@ -194,7 +193,9 @@ public class Weapon : MonoBehaviour
 
     public void DivideDamage(float multiplier)
     {
-        if (Mathf.Approximately(multiplier, 0f)) return;
+        if (Mathf.Approximately(multiplier, 0f))
+            return;
+
         damageMultiplier /= multiplier;
         damageMultiplier = Mathf.Clamp(damageMultiplier, 0.05f, 100f);
     }
@@ -211,31 +212,166 @@ public class Weapon : MonoBehaviour
     {
         piercingFanEnabled = enabled;
     }
-    private void ConfigureBullet(Bullet b, bool allowFanSpawn)
-    {
-        // Daño final: baseDamage del prefab * multiplier
-        int baseDmg = b.DefaultDamage;
-        int finalDmg = Mathf.RoundToInt(baseDmg * damageMultiplier);
 
-        b.SetOwnerWeapon(this);
-        b.SetDamage(finalDmg);
-        b.SetIgnite(igniteEnabled, igniteDamagePerTick, igniteDotDuration, igniteTickInterval);
-        b.SetPiercingFan(piercingFanEnabled, fanAngleDeg, fanSpawnOffset, allowFanSpawn);
-    }
-
-    // Usado por el fan: NO consume ammo, NO toca cooldown
     public void SpawnExtraBullet(Vector3 position, Quaternion rotation, bool allowFanSpawn)
     {
-        GameObject go = bulletPool ? bulletPool.Get() : Instantiate(bulletPrefab);
+        SpawnBullet(position, rotation, allowFanSpawn);
+    }
+
+    public void SetUseLocalInput(bool value)
+    {
+        useLocalInput = value;
+    }
+
+    public void ApplyStateFromNetwork(int currentAmmo, int totalAmmo, bool reloading)
+    {
+        bool wasReloading = IsReloading;
+        CurrentAmmo = Mathf.Max(0, currentAmmo);
+        TotalAmmo = Mathf.Max(0, totalAmmo);
+        IsReloading = reloading;
+        OnAmmoChanged?.Invoke(CurrentAmmo);
+        OnTotalAmmoChanged?.Invoke(TotalAmmo);
+
+        if (wasReloading && !IsReloading)
+            PlayReloadCompleteSfxLocal();
+
+    }
+
+    public void PlayShootSfxLocal(Vector3 position)
+    {
+        PlayShootSfx(position);
+    }
+
+    public void PlayReloadStartSfxLocal()
+    {
+        if (reloadStartSfx != null)
+        {
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlaySFX(reloadStartSfx, reloadVolume);
+            else
+                AudioSource.PlayClipAtPoint(reloadStartSfx, transform.position, reloadVolume);
+        }
+    }
+
+    private bool TryFireInternal(Vector3 position, Quaternion rotation, uint shotId, bool hasShotId)
+    {
+        if (!CanAttemptShot())
+            return false;
+
+        PlayShootSfx(position);
+
+        cooldown = SecondsPerShot;
+        CurrentAmmo--;
+        OnAmmoChanged?.Invoke(CurrentAmmo);
+
+        SpawnBullet(position, rotation, allowFanSpawn: true, shotId, hasShotId);
+        return true;
+    }
+
+    private void SpawnBullet(Vector3 position, Quaternion rotation, bool allowFanSpawn, uint shotId = 0u, bool hasShotId = false)
+    {
+        bool allowPooling = !LanRuntime.IsActive && bulletPool != null;
+        GameObject go = allowPooling ? bulletPool.Get() : Instantiate(bulletPrefab);
         go.transform.position = position;
         go.transform.rotation = rotation;
         go.SetActive(true);
 
-        if (go.TryGetComponent<Bullet>(out var b))
+        if (LanRuntime.IsServer && go.TryGetComponent<NetworkObject>(out var networkObject) && !networkObject.IsSpawned)
+            networkObject.Spawn(true);
+
+        if (!go.TryGetComponent<Bullet>(out var bullet))
+            return;
+
+        if (allowPooling)
+            bullet.Init(bulletPool);
+
+        ConfigureBullet(bullet, allowFanSpawn);
+
+        ulong shooterClientId = ResolveShotOwnerClientId();
+        bool shouldNotifyShotEnd = LanRuntime.IsServer && hasShotId && shooterClientId != ulong.MaxValue;
+        bullet.SetShotContext(shooterClientId, shotId, shouldNotifyShotEnd);
+    }
+
+    private void ConfigureBullet(Bullet bullet, bool allowFanSpawn)
+    {
+        int baseDmg = bullet.DefaultDamage;
+        int finalDmg = Mathf.RoundToInt(baseDmg * damageMultiplier);
+
+        bullet.SetOwnerWeapon(this);
+        bullet.SetDamage(finalDmg);
+        bullet.SetIgnite(igniteEnabled, igniteDamagePerTick, igniteDotDuration, igniteTickInterval);
+        bullet.SetPiercingFan(piercingFanEnabled, fanAngleDeg, fanSpawnOffset, allowFanSpawn);
+    }
+
+    private IEnumerator ReloadRoutine()
+    {
+        yield return new WaitForSeconds(reloadTime);
+
+        int needed = magazineSize - CurrentAmmo;
+        int takeFromReserve = Mathf.Min(needed, TotalAmmo);
+
+        CurrentAmmo += takeFromReserve;
+        TotalAmmo -= takeFromReserve;
+        IsReloading = false;
+
+        OnAmmoChanged?.Invoke(CurrentAmmo);
+        OnTotalAmmoChanged?.Invoke(TotalAmmo);
+
+        PlayReloadCompleteSfxLocal();
+    }
+
+    private void PlayReloadCompleteSfxLocal()
+    {
+        if (reloadCompleteSfx != null)
         {
-            if (bulletPool) b.Init(bulletPool);
-            ConfigureBullet(b, allowFanSpawn);
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlaySFX(reloadCompleteSfx, reloadVolume);
+            else
+                AudioSource.PlayClipAtPoint(reloadCompleteSfx, transform.position, reloadVolume);
         }
     }
 
+    private void PlayShootSfx(Vector3 position)
+    {
+        if (shootSfx == null)
+            return;
+
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySFX(shootSfx, shootVolume);
+        else
+            AudioSource.PlayClipAtPoint(shootSfx, position, shootVolume);
+    }
+
+    private Quaternion ApplySpread(Quaternion rotation, float spreadOffset)
+    {
+        return rotation * Quaternion.Euler(0f, 0f, spreadOffset);
+    }
+
+    private float ComputeSpreadOffset(uint shotId)
+    {
+        if (spreadDeg <= 0f)
+            return 0f;
+
+        uint hash = shotId;
+        hash ^= 2747636419u;
+        hash *= 2654435769u;
+        hash ^= hash >> 16;
+        float normalized = (hash & 0x00FFFFFFu) / 16777215f;
+        return Mathf.Lerp(-spreadDeg, spreadDeg, normalized);
+    }
+
+    private bool TryGetBulletTemplate(out Bullet bullet)
+    {
+        bullet = null;
+        return bulletPrefab != null && bulletPrefab.TryGetComponent(out bullet);
+    }
+
+    private ulong ResolveShotOwnerClientId()
+    {
+        if (!LanRuntime.IsActive)
+            return ulong.MaxValue;
+
+        LanPlayerAvatar lanPlayer = GetComponentInParent<LanPlayerAvatar>();
+        return lanPlayer != null ? lanPlayer.OwnerClientId : ulong.MaxValue;
+    }
 }
