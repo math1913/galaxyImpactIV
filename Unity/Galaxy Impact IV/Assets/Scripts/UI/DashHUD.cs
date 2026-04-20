@@ -6,7 +6,7 @@ public class DashHUD : MonoBehaviour
     [Header("Refs")]
     [SerializeField] private DashChargesEffect dash;
     [SerializeField] private Image icon;
-    [SerializeField] private Image[] bars; // tamaño 3
+    [SerializeField] private Image[] bars; // tamaÃ±o 3
     [SerializeField] private bool hideWhenFullAndNoPickupColorChange = false; // opcional
 
     private void Awake()
@@ -30,7 +30,12 @@ public class DashHUD : MonoBehaviour
             bars[i].color = filled ? dash.ActiveColor : dash.EmptyColor;
         }
 
-        // Si querés ocultarlo cuando no se usa, podés manejarlo acá.
+        // Si querÃ©s ocultarlo cuando no se usa, podÃ©s manejarlo acÃ¡.
         // Por defecto lo dejamos siempre visible.
+    }
+
+    public void BindPlayer(DashChargesEffect effect)
+    {
+        dash = effect;
     }
 }

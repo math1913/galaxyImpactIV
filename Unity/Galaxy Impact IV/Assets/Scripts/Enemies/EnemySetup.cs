@@ -5,31 +5,69 @@ using System.Collections;
 [RequireComponent(typeof(Seeker), typeof(AILerp), typeof(AIDestinationSetter))]
 public class EnemySetup : MonoBehaviour
 {
-    IEnumerator Start()
+    [SerializeField] private float retargetInterval = 0.25f;
+
+    private AIDestinationSetter setter;
+    private AILerp ai;
+    private float nextRetargetTime;
+    private bool initialized;
+
+    private void Awake()
     {
-        // Esperar a que el A* haya terminado de escanear
+        setter = GetComponent<AIDestinationSetter>();
+        ai = GetComponent<AILerp>();
+    }
+
+    private IEnumerator Start()
+    {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            yield break;
+
         yield return new WaitUntil(() => AstarPath.active != null && !AstarPath.active.isScanning);
 
-        var player = GameObject.FindGameObjectWithTag("Player")?.transform;
-        var setter = GetComponent<AIDestinationSetter>();
-        var ai = GetComponent<AILerp>();
+        if (ai != null)
+            ai.repathRate = 0.5f;
 
-        if (player != null)
-        {
-            setter.target = player;
+        RefreshTarget(forceSearch: true);
+        initialized = true;
+    }
 
-            // Configurar movimiento y búsqueda
-            ai.canMove = true;
-            ai.canSearch = true;
-            ai.isStopped = false;
-            ai.repathRate = 0.5f; // recalcular cada medio segundo
-            ai.SearchPath();       // forzar primera ruta
+    private void Update()
+    {
+        if (!initialized)
+            return;
 
-            Debug.Log($"{name}: Ruta inicializada hacia {player.name}");
-        }
-        else
-        {
-            Debug.LogWarning($"{name}: No se encontró un objeto con tag 'Player'.");
-        }
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
+        if (Time.time < nextRetargetTime)
+            return;
+
+        nextRetargetTime = Time.time + Mathf.Max(0.05f, retargetInterval);
+        RefreshTarget(forceSearch: true);
+    }
+
+    private void RefreshTarget(bool forceSearch)
+    {
+        if (setter == null)
+            return;
+
+        Transform player = LanRuntime.IsActive
+            ? LanPlayerAvatar.GetClosestPlayerTransform(transform.position)
+            : GameObject.FindGameObjectWithTag("Player")?.transform;
+
+        bool targetChanged = setter.target != player;
+        setter.target = player;
+
+        if (ai == null)
+            return;
+
+        bool hasTarget = player != null;
+        ai.canMove = hasTarget;
+        ai.canSearch = hasTarget;
+        ai.isStopped = !hasTarget;
+
+        if (hasTarget && (forceSearch || targetChanged))
+            ai.SearchPath();
     }
 }

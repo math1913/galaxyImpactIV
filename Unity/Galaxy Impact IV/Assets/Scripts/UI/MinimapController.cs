@@ -11,40 +11,68 @@ public class MinimapController : MonoBehaviour
     [SerializeField] Image enemyDotPrefab;
 
     [Header("Map Bounds (Background SpriteRenderer)")]
-    [SerializeField] SpriteRenderer background; // <-- tu Background
+    [SerializeField] SpriteRenderer background;
 
     [Header("Targets")]
     [SerializeField] Transform player;
     [SerializeField, Range(0f, 0.49f)]
-    float edgeMarginNormalized = 0.05f; // 5% de margen por cada lado
-
+    float edgeMarginNormalized = 0.05f;
 
     Image playerDot;
     readonly Dictionary<Transform, Image> enemyDots = new();
+    readonly List<Transform> staleEnemyEntries = new();
 
     void Awake()
     {
-        if (!dotsParent) dotsParent = minimapRect;
+        if (!dotsParent)
+            dotsParent = minimapRect;
+
         playerDot = Instantiate(playerDotPrefab, dotsParent);
         playerDot.raycastTarget = false;
     }
 
+    private void OnEnable()
+    {
+        EnemyController.OnEnemySpawned += HandleEnemySpawned;
+        EnemyController.OnEnemyDespawned += HandleEnemyDespawned;
+        RefreshEnemiesFromScene();
+    }
+
+    private void OnDisable()
+    {
+        EnemyController.OnEnemySpawned -= HandleEnemySpawned;
+        EnemyController.OnEnemyDespawned -= HandleEnemyDespawned;
+    }
+
     void LateUpdate()
     {
-        if (!background) return;
+        if (!background)
+            return;
 
-        if (player) UpdateDot(playerDot.rectTransform, player.position);
+        if (player)
+            UpdateDot(playerDot.rectTransform, player.position);
 
+        staleEnemyEntries.Clear();
         foreach (var kv in enemyDots)
         {
-            if (!kv.Key) continue;
+            if (!kv.Key)
+            {
+                staleEnemyEntries.Add(kv.Key);
+                continue;
+            }
+
             UpdateDot(kv.Value.rectTransform, kv.Key.position);
         }
+
+        foreach (var enemy in staleEnemyEntries)
+            UnregisterEnemy(enemy);
     }
 
     public void RegisterEnemy(Transform enemy)
     {
-        if (!enemy || enemyDots.ContainsKey(enemy)) return;
+        if (!enemy || enemyDots.ContainsKey(enemy))
+            return;
+
         var dot = Instantiate(enemyDotPrefab, dotsParent);
         dot.raycastTarget = false;
         enemyDots.Add(enemy, dot);
@@ -52,12 +80,16 @@ public class MinimapController : MonoBehaviour
 
     public void UnregisterEnemy(Transform enemy)
     {
-        if (!enemy) return;
-        if (enemyDots.TryGetValue(enemy, out var dot))
-        {
-            if (dot) Destroy(dot.gameObject);
-            enemyDots.Remove(enemy);
-        }
+        if (object.ReferenceEquals(enemy, null))
+            return;
+
+        if (!enemyDots.TryGetValue(enemy, out var registeredDot))
+            return;
+
+        if (registeredDot)
+            Destroy(registeredDot.gameObject);
+
+        enemyDots.Remove(enemy);
     }
 
     void UpdateDot(RectTransform dot, Vector3 worldPos)
@@ -68,16 +100,35 @@ public class MinimapController : MonoBehaviour
         float ny = Mathf.InverseLerp(b.min.y, b.max.y, worldPos.y);
 
         float m = edgeMarginNormalized;
-
-        // "Dentro" solo si está lejos del borde por al menos el margen
         bool inside = (nx >= m && nx <= 1f - m && ny >= m && ny <= 1f - m);
 
         dot.gameObject.SetActive(inside);
-        if (!inside) return;
+        if (!inside)
+            return;
 
         Vector2 size = minimapRect.rect.size;
         dot.anchoredPosition = new Vector2((nx - 0.5f) * size.x, (ny - 0.5f) * size.y);
     }
 
+    public void BindPlayer(Transform target)
+    {
+        player = target;
+        RefreshEnemiesFromScene();
+    }
 
+    private void HandleEnemySpawned(Transform enemy)
+    {
+        RegisterEnemy(enemy);
+    }
+
+    private void HandleEnemyDespawned(Transform enemy)
+    {
+        UnregisterEnemy(enemy);
+    }
+
+    private void RefreshEnemiesFromScene()
+    {
+        foreach (var enemy in FindObjectsOfType<EnemyController>(true))
+            RegisterEnemy(enemy.transform);
+    }
 }

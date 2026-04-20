@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using System.Collections;
 using System.Diagnostics;
+using Unity.Netcode;
 
 /// Componente genérico de vida, con eventos para UI o efectos.
 public class Health : MonoBehaviour
@@ -20,7 +21,9 @@ public class Health : MonoBehaviour
 
     private bool _isDead;
     private bool _invulnerable = false;
+    private ulong _lastDamageSourceClientId = ulong.MaxValue;
     public bool IsInvulnerable => _invulnerable;
+    public ulong LastDamageSourceClientId => _lastDamageSourceClientId;
 
     private Shield shield; // referencia si el jugador tiene escudo
     [Header("Damage Feedback")]
@@ -82,14 +85,17 @@ public class Health : MonoBehaviour
 
     public void Heal(int amount)
     {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer) return;
         if (_isDead) return;
         CurrentHealth = Mathf.Clamp(CurrentHealth + amount, 0, maxHealth);
         OnHealthChanged?.Invoke(CurrentHealth, maxHealth);
     }
 
-    public void TakeDamage(int amount)
+    public void TakeDamage(int amount, ulong damageSourceClientId = ulong.MaxValue)
     {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer) return;
         if (_isDead || _invulnerable || amount <= 0) return;
+        _lastDamageSourceClientId = damageSourceClientId;
         TriggerDamageFeedback();
         int remainingDamage = amount;
 
@@ -131,7 +137,10 @@ public class Health : MonoBehaviour
     private IEnumerator DestroyAfterFrame()
     {
         yield return null;
-        Destroy(gameObject);
+        if (TryGetComponent<NetworkObject>(out var networkObject) && networkObject.IsSpawned)
+            networkObject.Despawn(true);
+        else
+            Destroy(gameObject);
     }
 
     public void ResetHealth()
@@ -158,6 +167,11 @@ public class Health : MonoBehaviour
             if (_flashRoutine != null) StopCoroutine(_flashRoutine);
             _flashRoutine = StartCoroutine(DamageFlashCoroutine());
         }
+    }
+
+    public void PlayDamageFeedback()
+    {
+        TriggerDamageFeedback();
     }
 
     private IEnumerator DamageFlashCoroutine()
@@ -187,6 +201,35 @@ public class Health : MonoBehaviour
 
         if (clip != null && deathSoundVolume > 0f && AudioListener.volume > 0f)
             AudioSource.PlayClipAtPoint(clip, transform.position, deathSoundVolume);
+    }
+
+    public void PlayDeathFeedback()
+    {
+        TriggerDeathFeedback();
+    }
+
+    public void ApplyStateFromNetwork(int currentHealth, int maxHealthValue, bool dead, bool triggerDamageFeedback = true)
+    {
+        int previousHealth = CurrentHealth;
+        bool wasDead = _isDead;
+
+        maxHealth = Mathf.Max(1, maxHealthValue);
+        CurrentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+        OnHealthChanged?.Invoke(CurrentHealth, maxHealth);
+
+        if (triggerDamageFeedback && !wasDead && CurrentHealth < previousHealth)
+            TriggerDamageFeedback();
+
+        if (dead && !_isDead)
+        {
+            _isDead = true;
+            TriggerDeathFeedback();
+            OnDeath?.Invoke();
+            return;
+        }
+
+        if (!dead)
+            _isDead = false;
     }
 
 }

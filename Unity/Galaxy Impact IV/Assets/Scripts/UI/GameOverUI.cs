@@ -1,6 +1,7 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class GameOverUI : MonoBehaviour
 {
@@ -21,31 +22,58 @@ public class GameOverUI : MonoBehaviour
 
     private void Start()
     {
-        var stats = GameStatsManager.Instance;
-
-        // Score total
-        scoreText.text = stats.scoreThisRun.ToString() + " pts";
-
-        // Rondas completadas
-        roundsText.text = stats.wavesCompleted.ToString() + " waves";
-
-        timeText.text = stats.minutesPlayed.ToString() + " min";
-
-        // Kills por tipo
-        killsNormalText.text = stats.killsNormal.ToString() + " kills";
-        killsFastText.text = stats.killsFast.ToString() + " kills";
-        killsTankText.text = stats.killsTank.ToString() + " kills";
-        killsShooterText.text = stats.killsShooter.ToString() + " kills";
-
-        stats.ResetRunStats();
+        RefreshStatsUI();
+        StartCoroutine(RefreshStatsRoutine());
     }
 
     public void OnBackToMenu()
     {
-        SceneManager.LoadScene("MainMenu");
+        if (GameStatsManager.Instance != null)
+            GameStatsManager.Instance.ResetRunStats();
+
+        if (LanRuntime.IsActive || LanSessionLifecycle.LastClosedSessionWasLan)
+        {
+            LanSessionLifecycle.ExitToLobby();
+            return;
+        }
+
+        SceneManager.LoadScene(mainMenuScene);
     }
     public void PlayAgain()
     {
-        SceneManager.LoadScene("GameScene");
+        if (GameStatsManager.Instance != null)
+            GameStatsManager.Instance.ResetRunStats();
+
+        if (LanRuntime.IsActive || LanSessionLifecycle.LastClosedSessionWasLan)
+        {
+            LanSessionLifecycle.ExitToLobby();
+            return;
+        }
+
+        SceneManager.LoadScene(gameScene);
+    }
+
+    private IEnumerator RefreshStatsRoutine()
+    {
+        for (int i = 0; i < 90; i++)
+        {
+            RefreshStatsUI();
+            yield return null;
+        }
+    }
+
+    private void RefreshStatsUI()
+    {
+        var stats = GameStatsManager.Instance;
+        if (stats == null)
+            return;
+
+        scoreText.text = stats.scoreThisRun.ToString() + " pts";
+        roundsText.text = stats.wavesCompleted.ToString() + " waves";
+        timeText.text = stats.minutesPlayed.ToString() + " min";
+        killsNormalText.text = stats.killsNormal.ToString() + " kills";
+        killsFastText.text = stats.killsFast.ToString() + " kills";
+        killsTankText.text = stats.killsTank.ToString() + " kills";
+        killsShooterText.text = stats.killsShooter.ToString() + " kills";
     }
 }
