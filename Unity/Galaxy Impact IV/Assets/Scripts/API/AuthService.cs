@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 public class AuthService : MonoBehaviour
 {
-    private const string LOGIN_URL = "http://localhost:8080/api/auth/login";
-    private const string REGISTER_URL = "http://localhost:8080/api/users";
+    private const string LOGIN_URL = "http://25.14.61.56:8080/api/auth/login";
+    private const string REGISTER_URL = "http://25.14.61.56:8080/api/users";
 
 
     public async Task<LoginResponse> Login(string username, string password)
