@@ -22,7 +22,7 @@ public class PlayerDeathHandler : MonoBehaviour
             if (!LanRuntime.IsServer || lanPlayerAvatar == null)
                 return;
 
-            Debug.Log("El jugador ha muerto. Finalizando la partida LAN para todos.");
+            Debug.Log("El jugador ha muerto en LAN. Evaluando si todos los jugadores estan caidos.");
             LanPlayerAvatar.ServerHandlePlayerDeath(lanPlayerAvatar);
             return;
         }

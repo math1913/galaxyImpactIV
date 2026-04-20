@@ -175,6 +175,21 @@ public class PlayerController : MonoBehaviour
         _externalMoveInput = Vector2.zero;
     }
 
+    public void ForceStopMotion()
+    {
+        _moveInput = Vector2.zero;
+        _currentVelocity = Vector2.zero;
+        _overrideVelocityActive = false;
+        _overrideVelocity = Vector2.zero;
+        _externalMoveInput = Vector2.zero;
+
+        if (_rb != null)
+        {
+            _rb.linearVelocity = Vector2.zero;
+            _rb.angularVelocity = 0f;
+        }
+    }
+
     private void RotateTowards(Vector3 worldTarget)
     {
         Vector2 dir = worldTarget - transform.position;
