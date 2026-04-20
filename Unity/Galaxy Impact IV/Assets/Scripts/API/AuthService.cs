@@ -6,8 +6,8 @@ using System.Threading.Tasks;
 
 public class AuthService : MonoBehaviour
 {
-    private const string LOGIN_URL = "http://localhost:8080/api/auth/login";
-    private const string REGISTER_URL = "http://localhost:8080/api/users";
+    private const string LOGIN_URL = "http://25.14.61.56:8080/api/auth/login";
+    private const string REGISTER_URL = "http://25.14.61.56:8080/api/users";
 
 
     public async Task<LoginResponse> Login(string username, string password)
@@ -75,7 +75,7 @@ public class AuthService : MonoBehaviour
 
     public async System.Threading.Tasks.Task<User> GetUserById(int idUsuario)
     {
-        string url = $"http://localhost:8080/api/users/{idUsuario}";
+        string url = $"http://25.14.61.56:8080/api/users/{idUsuario}";
 
         using (UnityWebRequest www = UnityWebRequest.Get(url))
         {
@@ -99,7 +99,7 @@ public class AuthService : MonoBehaviour
     
     public async Task<User> UpdateStats(int idUsuario, int kills, int xpEarned)
     {
-        string url = $"http://localhost:8080/api/users/{idUsuario}/updateStats";
+        string url = $"http://25.14.61.56:8080/api/users/{idUsuario}/updateStats";
 
         StatsUpdateRequest req = new StatsUpdateRequest
         {

@@ -10,26 +10,33 @@ public class PauseController : MonoBehaviour
 
     private void Start()
     {
-        // Asegurar que arranca desactivado
         if (pausePanel != null)
             pausePanel.SetActive(false);
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            if (isPaused)
-                ResumeGame();
-            else
-                PauseGame();
-        }
+        if (!Input.GetKeyDown(KeyCode.Escape))
+            return;
+
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
+        if (isPaused)
+            ResumeGame();
+        else
+            PauseGame();
     }
 
     public void PauseGame()
     {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
         isPaused = true;
-        Time.timeScale = 0f;
+
+        if (!LanRuntime.IsActive)
+            Time.timeScale = 0f;
 
         if (pausePanel != null)
             pausePanel.SetActive(true);
@@ -37,6 +44,9 @@ public class PauseController : MonoBehaviour
 
     public void ResumeGame()
     {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
         isPaused = false;
         Time.timeScale = 1f;
 
@@ -44,10 +54,19 @@ public class PauseController : MonoBehaviour
             pausePanel.SetActive(false);
     }
 
-    // Por si tienes un botón "Volver al menú"
     public void GoToMainMenu(string mainMenuSceneName)
     {
-        Time.timeScale = 1f; // importante para no dejar el tiempo congelado
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
+        ResumeGame();
+
+        if (LanRuntime.IsActive)
+        {
+            LanSessionLifecycle.ExitToLobby();
+            return;
+        }
+
         SceneManager.LoadScene(mainMenuSceneName);
     }
 }

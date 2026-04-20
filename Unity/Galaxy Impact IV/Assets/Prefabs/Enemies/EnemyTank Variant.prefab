@@ -20,6 +20,10 @@ PrefabInstance:
       propertyPath: contactDamage
       value: 30
       objectReference: {fileID: 0}
+    - target: {fileID: 900000000000000001, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 603585714
+      objectReference: {fileID: 0}
     - target: {fileID: 1754694501609695684, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
       propertyPath: m_Size.x
       value: 6.983293

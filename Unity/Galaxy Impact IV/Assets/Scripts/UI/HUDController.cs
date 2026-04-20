@@ -40,12 +40,19 @@ public class HUDController : MonoBehaviour
 
     private int lastShieldValue;
 
-    // último valor de vida para diferenciar daño vs cura
+    // Ãºltimo valor de vida para diferenciar daÃ±o vs cura
     private int lastHealthValue;
 
     private void Start()
     {
-        if (waveManager)
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+        {
+            LanPlayerAvatar.OnWaveChanged += HandleLanWaveChanged;
+
+            if (LanPlayerAvatar.CurrentWave > 0)
+                UpdateWaveText(LanPlayerAvatar.CurrentWave);
+        }
+        else if (waveManager)
             waveManager.OnWaveStarted.AddListener(UpdateWaveText);
 
         if (healthBar)
@@ -55,29 +62,15 @@ public class HUDController : MonoBehaviour
             shieldOriginalColor = shieldBar.fillRect.GetComponent<UnityEngine.UI.Image>().color;
 
         if (playerHealth)
-        {
-            playerHealth.OnHealthChanged.AddListener(OnHealthChanged);
+            BindPlayer(playerHealth, playerWeapon, playerShield);
+    }
 
-            // Render inicial sin flashear (porque lastHealthValue no estaba seteado)
-            OnHealthChanged(playerHealth.CurrentHealth, playerHealth.MaxHealth);
-
-            // Inicializar el último valor después del primer render
-            lastHealthValue = playerHealth.CurrentHealth;
-        }
-
-        if (playerShield)
-        {
-            playerShield.OnShieldChanged.AddListener(OnShieldChanged);
-            OnShieldChanged(playerShield.CurrentShield, playerShield.MaxShield);
-            lastShieldValue = playerShield.CurrentShield;
-        }
-
-        if (playerWeapon)
-        {
-            playerWeapon.OnAmmoChanged.AddListener(UpdateAmmo);
-            playerWeapon.OnTotalAmmoChanged.AddListener(UpdateAmmo);
-            UpdateAmmo(playerWeapon.CurrentAmmo);
-        }
+    private void OnDestroy()
+    {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            LanPlayerAvatar.OnWaveChanged -= HandleLanWaveChanged;
+        else if (waveManager)
+            waveManager.OnWaveStarted.RemoveListener(UpdateWaveText);
     }
 
     private void OnHealthChanged(int current, int max)
@@ -88,7 +81,7 @@ public class HUDController : MonoBehaviour
         if (healthBar)
             healthBar.value = max > 0 ? (float)current / max : 0f;
 
-        //flashear solo si bajó respecto al valor anterior
+        //flashear solo si bajÃ³ respecto al valor anterior
         if (current < lastHealthValue)
             StartCoroutine(FlashBar(healthBar, healthFlashColor, healthOriginalColor));
 
@@ -114,7 +107,7 @@ public class HUDController : MonoBehaviour
 
     private void UpdateAmmo(int _)
     {
-        if (!ammoText) return;
+        if (!ammoText || playerWeapon == null) return;
 
         int current = playerWeapon.CurrentAmmo;
 
@@ -129,6 +122,14 @@ public class HUDController : MonoBehaviour
         waveText.text = $"ROUND {wave}";
     }
 
+    private void HandleLanWaveChanged(int wave)
+    {
+        if (waveManager != null)
+            waveManager.ApplyNetworkWaveStarted(wave);
+
+        UpdateWaveText(wave);
+    }
+
     private IEnumerator FlashBar(UnityEngine.UI.Slider bar, Color flashColor, Color originalColor)
     {
         if (bar == null || bar.fillRect == null) yield break;
@@ -139,5 +140,43 @@ public class HUDController : MonoBehaviour
         image.color = flashColor;
         yield return new WaitForSeconds(flashDuration);
         image.color = originalColor;
+    }
+
+    public void BindPlayer(Health health, Weapon weapon, Shield shield)
+    {
+        if (playerHealth != null)
+            playerHealth.OnHealthChanged.RemoveListener(OnHealthChanged);
+        if (playerShield != null)
+            playerShield.OnShieldChanged.RemoveListener(OnShieldChanged);
+        if (playerWeapon != null)
+        {
+            playerWeapon.OnAmmoChanged.RemoveListener(UpdateAmmo);
+            playerWeapon.OnTotalAmmoChanged.RemoveListener(UpdateAmmo);
+        }
+
+        playerHealth = health;
+        playerWeapon = weapon;
+        playerShield = shield;
+
+        if (playerHealth != null)
+        {
+            playerHealth.OnHealthChanged.AddListener(OnHealthChanged);
+            OnHealthChanged(playerHealth.CurrentHealth, playerHealth.MaxHealth);
+            lastHealthValue = playerHealth.CurrentHealth;
+        }
+
+        if (playerShield != null)
+        {
+            playerShield.OnShieldChanged.AddListener(OnShieldChanged);
+            OnShieldChanged(playerShield.CurrentShield, playerShield.MaxShield);
+            lastShieldValue = playerShield.CurrentShield;
+        }
+
+        if (playerWeapon != null)
+        {
+            playerWeapon.OnAmmoChanged.AddListener(UpdateAmmo);
+            playerWeapon.OnTotalAmmoChanged.AddListener(UpdateAmmo);
+            UpdateAmmo(playerWeapon.CurrentAmmo);
+        }
     }
 }

@@ -5,8 +5,8 @@ public class BuffIconsHUD : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private BuffManager buffManager;
-    [SerializeField] private Image[] slots; // tamaño 3
-    [SerializeField] private Image[] radials; // tamaño 3, Image Filled Radial360
+    [SerializeField] private Image[] slots; // tamaÃ±o 3
+    [SerializeField] private Image[] radials; // tamaÃ±o 3, Image Filled Radial360
 
     [SerializeField] private CanvasGroup canvasGroup; // opcional
 
@@ -31,7 +31,7 @@ public class BuffIconsHUD : MonoBehaviour
 
     private void Update()
     {
-        // Es barato (máx 3). Si luego querés, lo hacemos event-driven.
+        // Es barato (mÃ¡x 3). Si luego querÃ©s, lo hacemos event-driven.
         Refresh();
     }
 
@@ -87,9 +87,15 @@ public class BuffIconsHUD : MonoBehaviour
         }
         else
         {
-            // fallback: activa/desactiva imágenes
+            // fallback: activa/desactiva imÃ¡genes
             for (int i = 0; i < slots.Length; i++)
                 slots[i].enabled = visible && slots[i].enabled;
         }
+    }
+
+    public void BindPlayer(BuffManager manager)
+    {
+        buffManager = manager;
+        Refresh();
     }
 }
