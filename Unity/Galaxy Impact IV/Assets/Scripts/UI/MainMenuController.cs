@@ -32,6 +32,12 @@ public class MainMenuController : MonoBehaviour
 
         currentUser = await authService.GetUserById(userId);
 
+        if (currentUser != null)
+{
+            PlayerPrefs.SetString("username", currentUser.username); // Guardamos el nombre
+            PlayerPrefs.Save();
+        }
+
         if (currentUser == null)
         {
             Debug.LogError("No se pudo cargar el usuario desde la API");
