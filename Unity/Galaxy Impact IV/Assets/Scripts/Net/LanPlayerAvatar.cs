@@ -135,36 +135,6 @@ public class LanPlayerAvatar : NetworkBehaviour
         ApplyReplicatedWave(authorityAvatar.syncedWave.Value);
     }
 
-    public static void ServerRespawnDeadPlayersForWaveStart()
-    {
-        if (!LanRuntime.IsServer || s_serverMatchEnded)
-            return;
-
-        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
-        {
-            if (lanPlayer == null)
-                continue;
-
-            lanPlayer.RespawnIfDeadForWaveStart();
-        }
-    }
-
-    private static bool AreAllActivePlayersDead()
-    {
-        bool anyPlayer = false;
-        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
-        {
-            if (lanPlayer == null)
-                continue;
-
-            anyPlayer = true;
-            if (lanPlayer.IsAlive)
-                return false;
-        }
-
-        return anyPlayer;
-    }
-
     public static void ServerRecordWaveCompleted(int waveNumber)
     {
         if (!LanRuntime.IsServer)
@@ -253,11 +223,6 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (!LanRuntime.IsServer || deadAvatar == null || s_serverMatchEnded)
             return;
 
-        deadAvatar.EnterDownedStateOnServer();
-
-        if (!AreAllActivePlayersDead())
-            return;
-
         s_serverMatchEnded = true;
         s_replicatedMatchEnded = true;
 
@@ -308,75 +273,6 @@ public class LanPlayerAvatar : NetworkBehaviour
         }
 
         return stats;
-    }
-
-    private void EnterDownedStateOnServer()
-    {
-        if (!IsServer)
-            return;
-
-        serverMoveInput = Vector2.zero;
-        serverReloadRequested = false;
-        serverDashRequested = false;
-        serverAimWorld = transform.position + transform.right;
-
-        if (playerController != null)
-        {
-            playerController.SetExternalInput(Vector2.zero, serverAimWorld);
-            playerController.ForceStopMotion();
-        }
-
-        if (dash != null)
-            dash.ResetDashState();
-
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector2.zero;
-            rb.angularVelocity = 0f;
-        }
-    }
-
-    private void RespawnIfDeadForWaveStart()
-    {
-        if (!IsServer || health == null || !health.IsDead)
-            return;
-
-        Vector3 spawnPosition = GetSpawnPosition(OwnerClientId);
-        transform.SetPositionAndRotation(spawnPosition, Quaternion.identity);
-
-        if (rb != null)
-        {
-            rb.position = spawnPosition;
-            rb.rotation = 0f;
-            rb.linearVelocity = Vector2.zero;
-            rb.angularVelocity = 0f;
-            rb.simulated = true;
-        }
-
-        serverMoveInput = Vector2.zero;
-        serverAimWorld = spawnPosition + Vector3.right;
-        serverReloadRequested = false;
-        serverDashRequested = false;
-
-        if (playerController != null)
-        {
-            playerController.SetExternalInput(Vector2.zero, serverAimWorld);
-            playerController.ForceStopMotion();
-        }
-
-        if (dash != null)
-        {
-            dash.ResetDashState();
-            dash.ResetChargesToFull();
-        }
-
-        if (shield != null)
-            shield.ApplyStateFromNetwork(0, shield.MaxShield);
-
-        health.SetInvulnerable(false);
-        health.ResetHealth();
-
-        SyncStateFromComponents();
     }
 
     private static void ApplyReplicatedWave(int wave)
@@ -490,46 +386,26 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         if (IsServer)
         {
-            bool playerDead = health != null && health.CurrentHealth <= 0;
-            if (playerDead || s_serverMatchEnded)
-            {
-                serverMoveInput = Vector2.zero;
-                serverReloadRequested = false;
-                serverDashRequested = false;
-                serverAimWorld = transform.position + transform.right;
-
-                if (playerController != null)
-                {
-                    playerController.SetExternalInput(Vector2.zero, serverAimWorld);
-                    if (playerDead)
-                        playerController.ForceStopMotion();
-                }
-
-                if (playerDead && dash != null)
-                    dash.ResetDashState();
-
-                if (rb != null)
-                {
-                    rb.linearVelocity = Vector2.zero;
-                    rb.angularVelocity = 0f;
-                }
-
-                SyncStateFromComponents();
-                return;
-            }
-
             if (playerController != null)
                 playerController.SetExternalInput(serverMoveInput, serverAimWorld);
 
-            if (serverReloadRequested && weapon != null)
+            if (!s_serverMatchEnded)
             {
-                weapon.Reload();
-                serverReloadRequested = false;
-            }
+                if (serverReloadRequested && weapon != null)
+                {
+                    weapon.Reload();
+                    serverReloadRequested = false;
+                }
 
-            if (serverDashRequested && dash != null)
+                if (serverDashRequested && dash != null)
+                {
+                    dash.TryDashTowards(serverAimWorld);
+                    serverDashRequested = false;
+                }
+            }
+            else
             {
-                dash.TryDashTowards(serverAimWorld);
+                serverReloadRequested = false;
                 serverDashRequested = false;
             }
 
@@ -593,11 +469,8 @@ public class LanPlayerAvatar : NetworkBehaviour
     [ServerRpc]
     private void SubmitInputServerRpc(Vector2 moveInput, Vector3 aimWorld)
     {
-        if (s_serverMatchEnded || health == null || health.CurrentHealth <= 0)
-        {
-            serverMoveInput = Vector2.zero;
+        if (s_serverMatchEnded)
             return;
-        }
 
         ApplyOwnerInput(moveInput, aimWorld);
     }
@@ -628,14 +501,14 @@ public class LanPlayerAvatar : NetworkBehaviour
     [ServerRpc]
     private void RequestReloadServerRpc()
     {
-        if (!s_serverMatchEnded && health != null && health.CurrentHealth > 0)
+        if (!s_serverMatchEnded)
             serverReloadRequested = true;
     }
 
     [ServerRpc]
     private void RequestDashServerRpc(Vector3 aimWorld)
     {
-        if (s_serverMatchEnded || health == null || health.CurrentHealth <= 0)
+        if (s_serverMatchEnded)
             return;
 
         serverAimWorld = aimWorld;
@@ -736,9 +609,6 @@ public class LanPlayerAvatar : NetworkBehaviour
 
     private void TryFireAsHost()
     {
-        if (health == null || health.CurrentHealth <= 0)
-            return;
-
         if (weapon == null || !weapon.CanAttemptShot() || !weapon.TryGetMuzzleSnapshot(out Vector3 position, out Quaternion rotation))
             return;
 
@@ -920,7 +790,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         ApplyReplicatedWave(0);
     }
 
-    private static Vector3 GetSpawnPosition(ulong clientId)
+    private Vector3 GetSpawnPosition(ulong clientId)
     {
         float angle = (clientId % 8) * 45f * Mathf.Deg2Rad;
         float radius = 2.5f;

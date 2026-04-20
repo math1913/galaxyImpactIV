@@ -10,13 +10,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float moveSpeed = 6f;
     [SerializeField] private float acceleration = 20f;
     [SerializeField] private float deceleration = 30f;
-    [Header("Configuración de Movimiento")]
-    public float speedMultiplier = 1f; // Multiplicador de velocidad (ajústalo en el Inspector)
-    public float margin = 0.5f;
 
     [Header("Referencias")]
     [SerializeField] private Camera cam;
     [SerializeField] private SpriteRenderer background; // Fondo de referencia
+    [SerializeField] private float margin = 0.5f;       // Margen interno opcional
+    [Header("Buffs")]
+    [SerializeField] private float speedMultiplier = 1f;
 
     //exponer al HUD/debug
     public float BaseMoveSpeed => moveSpeed;
@@ -173,21 +173,6 @@ public class PlayerController : MonoBehaviour
     {
         _useExternalInput = false;
         _externalMoveInput = Vector2.zero;
-    }
-
-    public void ForceStopMotion()
-    {
-        _moveInput = Vector2.zero;
-        _currentVelocity = Vector2.zero;
-        _overrideVelocityActive = false;
-        _overrideVelocity = Vector2.zero;
-        _externalMoveInput = Vector2.zero;
-
-        if (_rb != null)
-        {
-            _rb.linearVelocity = Vector2.zero;
-            _rb.angularVelocity = 0f;
-        }
     }
 
     private void RotateTowards(Vector3 worldTarget)

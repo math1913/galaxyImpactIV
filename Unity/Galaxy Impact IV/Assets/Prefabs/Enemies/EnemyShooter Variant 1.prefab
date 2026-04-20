@@ -164,7 +164,7 @@ MonoBehaviour:
   isPlayer: 0
   deathSound: {fileID: 0}
   playerDeathSound: {fileID: 0}
-  enemyDeathSound: {fileID: 8300000, guid: e8bba68453082f84f8be251eeb850c64, type: 3}
+  enemyDeathSound: {fileID: 0}
   deathSoundVolume: 1
 --- !u!114 &4597270814930053460
 MonoBehaviour:
@@ -235,7 +235,7 @@ MonoBehaviour:
   enemyType: 3
   contactDamage: 10
   touchCooldown: 0.5
-  moveSpeed: 2
+  moveSpeed: 1
   health: {fileID: 0}
   OnDeath:
     m_PersistentCalls:

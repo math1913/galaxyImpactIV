@@ -14,7 +14,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 848928328293391054, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
       propertyPath: moveSpeed
-      value: 2
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 848928328293391054, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
       propertyPath: contactDamage
@@ -121,17 +121,9 @@ PrefabInstance:
       value: EnemyTank Variant
       objectReference: {fileID: 0}
     - target: {fileID: 7106343360093263309, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
-      propertyPath: isPlayer
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 7106343360093263309, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
       propertyPath: maxHealth
       value: 60
       objectReference: {fileID: 0}
-    - target: {fileID: 7106343360093263309, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
-      propertyPath: enemyDeathSound
-      value: 
-      objectReference: {fileID: 8300000, guid: 0046ee7a75f12ea4c8ce004a97c14581, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

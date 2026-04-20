@@ -137,13 +137,4 @@ public class DashChargesEffect : MonoBehaviour
     {
         activeColor = filledColor;
     }
-
-    public void ResetDashState()
-    {
-        isDashing = false;
-        dashEndTime = 0f;
-        nextDashTime = 0f;
-        if (pc != null)
-            pc.ClearOverrideVelocity();
-    }
 }
