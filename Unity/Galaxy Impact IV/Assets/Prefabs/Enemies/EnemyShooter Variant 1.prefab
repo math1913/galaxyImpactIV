@@ -207,7 +207,7 @@ MonoBehaviour:
   enemyType: 3
   contactDamage: 10
   touchCooldown: 0.5
-  moveSpeed: 1
+  moveSpeed: 2
   health: {fileID: 0}
   OnDeath:
     m_PersistentCalls:
