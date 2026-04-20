@@ -794,12 +794,12 @@ GameObject:
   - component: {fileID: 155139136}
   - component: {fileID: 155139135}
   - component: {fileID: 155139140}
-  - component: {fileID: 155139139}
   - component: {fileID: 155139141}
-  - component: {fileID: 155139142}
   - component: {fileID: 155139143}
-  - component: {fileID: 155139144}
   - component: {fileID: 155139145}
+  - component: {fileID: 155139148}
+  - component: {fileID: 155139147}
+  - component: {fileID: 155139146}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -941,25 +941,6 @@ Transform:
   - {fileID: 1473738134}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 90}
---- !u!114 &155139139
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 155139134}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 78a9cf851e9560845b7ff5e9cbbe4d45, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  moveSpeed: 3
-  acceleration: 40
-  deceleration: 40
-  cam: {fileID: 319980085}
-  background: {fileID: 45101324}
-  margin: 3
-  speedMultiplier: 1
 --- !u!114 &155139140
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1014,18 +995,6 @@ MonoBehaviour:
   OnShieldChanged:
     m_PersistentCalls:
       m_Calls: []
---- !u!114 &155139142
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 155139134}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c1c11d8416226a2469df835a0d66878d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!114 &155139143
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1038,27 +1007,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d747cf5ba3cfb7745ac27d760789e6cd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &155139144
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 155139134}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cbdffa704c832b94ba9173347973346b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  dashKey: 304
-  maxCharges: 3
-  charges: 0
-  dashDistanceUnits: 2
-  dashDuration: 0.1
-  dashCooldown: 0.05
-  activeColor: {r: 1, g: 1, b: 1, a: 1}
-  emptyColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
-  cam: {fileID: 319980085}
 --- !u!114 &155139145
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1072,6 +1020,58 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   healAmount: 5
+--- !u!114 &155139146
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 155139134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b3b3a41d9585e64a8e7ae5f5ca980dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &155139147
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 155139134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3ecb25e78614f394a8f4d72e38ae169c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  moveSpeed: 3.5
+  acceleration: 20
+  deceleration: 30
+  cam: {fileID: 319980085}
+  background: {fileID: 45101324}
+  margin: 0.5
+  speedMultiplier: 1
+--- !u!114 &155139148
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 155139134}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4ec7ffa8976155498090cb712a723b3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  dashKey: 304
+  maxCharges: 3
+  charges: 3
+  dashDistanceUnits: 2.2
+  dashDuration: 0.1
+  dashCooldown: 0.05
+  activeColor: {r: 1, g: 1, b: 1, a: 1}
+  emptyColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
+  cam: {fileID: 0}
 --- !u!1 &178260591
 GameObject:
   m_ObjectHideFlags: 0
@@ -1167,6 +1167,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -2867,6 +2868,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -4603,7 +4605,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 72ee0ee1bf6312d4bb6a024d7fd5df9d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dash: {fileID: 155139144}
+  dash: {fileID: 0}
   icon: {fileID: 0}
   bars:
   - {fileID: 333917155}
@@ -4731,6 +4733,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -5017,6 +5020,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -5438,6 +5442,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -6700,6 +6705,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -6836,6 +6842,7 @@ MonoBehaviour:
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
@@ -7448,6 +7455,7 @@ MonoBehaviour:
   m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
+  m_characterHorizontalScale: 1
   m_wordSpacing: 0
   m_lineSpacing: 0
   m_lineSpacingMax: 0
