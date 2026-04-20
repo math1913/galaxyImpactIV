@@ -8533,6 +8533,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 1480989378502689383, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
+      propertyPath: playerDeathSound
+      value: 
+      objectReference: {fileID: 8300000, guid: 9f8d4ffa8baf3d4428449e36f0ab5bda, type: 3}
+    - target: {fileID: 2198097510065819800, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: -889739676950766307, guid: 7b33cad1e88032048b6ff34b1e24b60a, type: 3}
     - target: {fileID: 2809071517921235701, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
       propertyPath: bulletPool
       value: 
