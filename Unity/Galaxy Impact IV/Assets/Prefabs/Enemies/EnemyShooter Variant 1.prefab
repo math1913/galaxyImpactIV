@@ -207,7 +207,7 @@ MonoBehaviour:
   isPlayer: 0
   deathSound: {fileID: 0}
   playerDeathSound: {fileID: 0}
-  enemyDeathSound: {fileID: 0}
+  enemyDeathSound: {fileID: 8300000, guid: e8bba68453082f84f8be251eeb850c64, type: 3}
   deathSoundVolume: 1
 --- !u!114 &4597270814930053460
 MonoBehaviour:
@@ -252,7 +252,7 @@ MonoBehaviour:
   enemyType: 3
   contactDamage: 10
   touchCooldown: 0.5
-  moveSpeed: 1
+  moveSpeed: 2
   health: {fileID: 0}
   OnDeath:
     m_PersistentCalls:
@@ -420,6 +420,11 @@ MonoBehaviour:
   spreadDeg: 2
   automaticFire: 1
   autoReload: 1
+  shootSfx: {fileID: 0}
+  reloadStartSfx: {fileID: 0}
+  reloadCompleteSfx: {fileID: 0}
+  shootVolume: 1
+  reloadVolume: 1
   totalAmmo: 100000
   OnAmmoChanged:
     m_PersistentCalls:
@@ -482,6 +487,11 @@ MonoBehaviour:
   spreadDeg: 2
   automaticFire: 1
   autoReload: 1
+  shootSfx: {fileID: 0}
+  reloadStartSfx: {fileID: 0}
+  reloadCompleteSfx: {fileID: 0}
+  shootVolume: 1
+  reloadVolume: 1
   totalAmmo: 90
   OnAmmoChanged:
     m_PersistentCalls:
