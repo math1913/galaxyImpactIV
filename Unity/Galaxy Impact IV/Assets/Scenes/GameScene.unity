@@ -1513,6 +1513,7 @@ MonoBehaviour:
   dotsParent: {fileID: 0}
   playerDotPrefab: {fileID: 7154715751353929312, guid: 9bc96a74b3830154495accbafad79d12, type: 3}
   enemyDotPrefab: {fileID: 3045408076971141995, guid: c40a6941925645747ae365836eec5195, type: 3}
+  allyDotPrefab: {fileID: 7154715751353929312, guid: f644abd7da0d41d5ae695f7fdc8b165e, type: 3}
   background: {fileID: 45101324}
   player: {fileID: 155139138}
   edgeMarginNormalized: 0.02

@@ -9,6 +9,7 @@ public class MinimapController : MonoBehaviour
     [SerializeField] RectTransform dotsParent;
     [SerializeField] Image playerDotPrefab;
     [SerializeField] Image enemyDotPrefab;
+    [SerializeField] Image allyDotPrefab;
 
     [Header("Map Bounds (Background SpriteRenderer)")]
     [SerializeField] SpriteRenderer background;
@@ -21,6 +22,8 @@ public class MinimapController : MonoBehaviour
     Image playerDot;
     readonly Dictionary<Transform, Image> enemyDots = new();
     readonly List<Transform> staleEnemyEntries = new();
+    readonly Dictionary<Transform, Image> allyDots = new();
+    readonly List<Transform> staleAllyEntries = new();
 
     void Awake()
     {
@@ -66,6 +69,8 @@ public class MinimapController : MonoBehaviour
 
         foreach (var enemy in staleEnemyEntries)
             UnregisterEnemy(enemy);
+
+        UpdateAllies();
     }
 
     public void RegisterEnemy(Transform enemy)
@@ -90,6 +95,30 @@ public class MinimapController : MonoBehaviour
             Destroy(registeredDot.gameObject);
 
         enemyDots.Remove(enemy);
+    }
+
+    public void RegisterAlly(Transform ally)
+    {
+        if (!ally || !allyDotPrefab || allyDots.ContainsKey(ally))
+            return;
+
+        var dot = Instantiate(allyDotPrefab, dotsParent);
+        dot.raycastTarget = false;
+        allyDots.Add(ally, dot);
+    }
+
+    public void UnregisterAlly(Transform ally)
+    {
+        if (object.ReferenceEquals(ally, null))
+            return;
+
+        if (!allyDots.TryGetValue(ally, out var registeredDot))
+            return;
+
+        if (registeredDot)
+            Destroy(registeredDot.gameObject);
+
+        allyDots.Remove(ally);
     }
 
     void UpdateDot(RectTransform dot, Vector3 worldPos)
@@ -130,5 +159,34 @@ public class MinimapController : MonoBehaviour
     {
         foreach (var enemy in FindObjectsOfType<EnemyController>(true))
             RegisterEnemy(enemy.transform);
+    }
+
+    private void UpdateAllies()
+    {
+        staleAllyEntries.Clear();
+        foreach (var kv in allyDots)
+            staleAllyEntries.Add(kv.Key);
+
+        IReadOnlyList<LanPlayerAvatar> activePlayers = LanPlayerAvatar.ActivePlayers;
+        for (int i = 0; i < activePlayers.Count; i++)
+        {
+            LanPlayerAvatar lanPlayer = activePlayers[i];
+            if (lanPlayer == null || !lanPlayer.IsAlive)
+                continue;
+
+            Transform ally = lanPlayer.transform;
+            if (!ally || ally == player)
+                continue;
+
+            RegisterAlly(ally);
+
+            if (allyDots.TryGetValue(ally, out var allyDot) && allyDot)
+                UpdateDot(allyDot.rectTransform, ally.position);
+
+            staleAllyEntries.Remove(ally);
+        }
+
+        foreach (var ally in staleAllyEntries)
+            UnregisterAlly(ally);
     }
 }
