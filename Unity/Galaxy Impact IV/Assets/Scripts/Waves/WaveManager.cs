@@ -210,7 +210,10 @@ public class WaveManager : MonoBehaviour
         {
             currentWave = i;
             if (LanRuntime.IsActive)
+            {
                 LanPlayerAvatar.ServerSetCurrentWave(currentWave);
+                LanPlayerAvatar.ServerRespawnDeadPlayersForWaveStart();
+            }
 
             OnWaveStarted?.Invoke(currentWave);
             if (playWaveStartSfx && waveStartSfx != null)
