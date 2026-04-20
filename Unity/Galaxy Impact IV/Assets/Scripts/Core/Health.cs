@@ -13,7 +13,6 @@ public class Health : MonoBehaviour
 
     public int MaxHealth => maxHealth;
     public int CurrentHealth { get; private set; }
-    public bool IsDead => _isDead;
 
     [Header("Events")]
     public UnityEvent<int, int> OnHealthChanged; // (current, max)
@@ -131,20 +130,8 @@ public class Health : MonoBehaviour
         TriggerDeathFeedback();
         OnDeath?.Invoke();
 
-        if (ShouldDestroyOnDeath())
+        if (destroyOnDeath)
             StartCoroutine(DestroyAfterFrame());
-    }
-
-    private bool ShouldDestroyOnDeath()
-    {
-        if (!destroyOnDeath)
-            return false;
-
-        // Los jugadores deben mantenerse en escena para poder revivir en la siguiente ronda LAN.
-        if (CompareTag("Player"))
-            return false;
-
-        return true;
     }
 
     private IEnumerator DestroyAfterFrame()
