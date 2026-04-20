@@ -158,7 +158,7 @@ MonoBehaviour:
   isPlayer: 0
   deathSound: {fileID: 0}
   playerDeathSound: {fileID: 0}
-  enemyDeathSound: {fileID: 0}
+  enemyDeathSound: {fileID: 8300000, guid: ff601fc205a137e4ca49485d35672940, type: 3}
   deathSoundVolume: 1
 --- !u!114 &6129403065283605713
 MonoBehaviour:
