@@ -33,6 +33,14 @@ public class Shield : MonoBehaviour
         return absorbed; // cantidad de daÃ±o mitigado
     }
 
+    public void ResetToMax()
+    {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer) return;
+
+        currentShield = Mathf.Max(0, maxShield);
+        OnShieldChanged.Invoke(currentShield, maxShield);
+    }
+
     public void ApplyStateFromNetwork(int currentValue, int maxValue)
     {
         maxShield = Mathf.Max(0, maxValue);

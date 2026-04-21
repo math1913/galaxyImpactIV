@@ -46,6 +46,7 @@ public class Weapon : MonoBehaviour
     private float fireRateMultiplier = 1f;
     private float damageMultiplier = 1f;
     private bool useLocalInput = true;
+    private Coroutine reloadRoutine;
 
     private bool igniteEnabled = false;
     private int igniteDamagePerTick = 2;
@@ -156,7 +157,7 @@ public class Weapon : MonoBehaviour
 
         OnAmmoChanged?.Invoke(CurrentAmmo);
         OnTotalAmmoChanged?.Invoke(TotalAmmo);
-        StartCoroutine(ReloadRoutine());
+        reloadRoutine = StartCoroutine(ReloadRoutine());
     }
 
     public bool CanReload()
@@ -167,6 +168,26 @@ public class Weapon : MonoBehaviour
     public void AddAmmo(int amount)
     {
         TotalAmmo += amount;
+        OnTotalAmmoChanged?.Invoke(TotalAmmo);
+    }
+
+    public void ResetAmmoToDefaults()
+    {
+        if (LanRuntime.IsActive && !LanRuntime.IsServer)
+            return;
+
+        if (reloadRoutine != null)
+        {
+            StopCoroutine(reloadRoutine);
+            reloadRoutine = null;
+        }
+
+        IsReloading = false;
+        CurrentAmmo = Mathf.Max(0, magazineSize);
+        TotalAmmo = Mathf.Max(0, totalAmmo);
+        cooldown = 0f;
+
+        OnAmmoChanged?.Invoke(CurrentAmmo);
         OnTotalAmmoChanged?.Invoke(TotalAmmo);
     }
 
@@ -318,6 +339,7 @@ public class Weapon : MonoBehaviour
         OnTotalAmmoChanged?.Invoke(TotalAmmo);
 
         PlayReloadCompleteSfxLocal();
+        reloadRoutine = null;
     }
 
     private void PlayReloadCompleteSfxLocal()

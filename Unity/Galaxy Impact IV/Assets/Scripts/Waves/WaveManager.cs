@@ -266,7 +266,10 @@ public class WaveManager : MonoBehaviour
 
             OnWaveCompleted?.Invoke(currentWave);
             if (LanRuntime.IsActive)
+            {
                 LanPlayerAvatar.ServerRecordWaveCompleted(currentWave);
+                LanPlayerAvatar.ServerReviveDeadPlayersAfterWave();
+            }
 
             if (spawnPickupsOnWaveEnd)
                 SpawnPickupsForWave();

@@ -218,9 +218,38 @@ public class LanPlayerAvatar : NetworkBehaviour
         collectorAvatar.PickupFeedbackClientRpc(pickupNetworkObjectId, targetParams);
     }
 
+    public static bool ServerHasAlivePlayers()
+    {
+        if (!LanRuntime.IsServer)
+            return false;
+
+        return HasAtLeastOneAlivePlayer();
+    }
+
+    public static void ServerReviveDeadPlayersAfterWave()
+    {
+        if (!LanRuntime.IsServer || s_serverMatchEnded)
+            return;
+
+        if (!HasAtLeastOneAlivePlayer())
+            return;
+
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer == null || lanPlayer.IsAlive)
+                continue;
+
+            lanPlayer.ServerReviveAtSpawn();
+        }
+    }
+
     public static void ServerHandlePlayerDeath(LanPlayerAvatar deadAvatar)
     {
         if (!LanRuntime.IsServer || deadAvatar == null || s_serverMatchEnded)
+            return;
+
+        deadAvatar.ServerFreezeAfterDeath();
+        if (HasAtLeastOneAlivePlayer())
             return;
 
         s_serverMatchEnded = true;
@@ -262,6 +291,17 @@ public class LanPlayerAvatar : NetworkBehaviour
             authorityAvatar.StartCoroutine(authorityAvatar.LoadGameOverAfterStatsFrame());
         else
             SceneManager.LoadScene(GameOverSceneName);
+    }
+
+    private static bool HasAtLeastOneAlivePlayer()
+    {
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer != null && lanPlayer.IsAlive)
+                return true;
+        }
+
+        return false;
     }
 
     private static LanRunStatsSnapshot GetOrCreateServerStats(ulong clientId)
@@ -389,7 +429,8 @@ public class LanPlayerAvatar : NetworkBehaviour
             if (playerController != null)
                 playerController.SetExternalInput(serverMoveInput, serverAimWorld);
 
-            if (!s_serverMatchEnded)
+            bool canProcessGameplayInput = health == null || health.CurrentHealth > 0;
+            if (!s_serverMatchEnded && canProcessGameplayInput)
             {
                 if (serverReloadRequested && weapon != null)
                 {
@@ -469,7 +510,7 @@ public class LanPlayerAvatar : NetworkBehaviour
     [ServerRpc]
     private void SubmitInputServerRpc(Vector2 moveInput, Vector3 aimWorld)
     {
-        if (s_serverMatchEnded)
+        if (s_serverMatchEnded || (health != null && health.CurrentHealth <= 0))
             return;
 
         ApplyOwnerInput(moveInput, aimWorld);
@@ -501,14 +542,14 @@ public class LanPlayerAvatar : NetworkBehaviour
     [ServerRpc]
     private void RequestReloadServerRpc()
     {
-        if (!s_serverMatchEnded)
+        if (!s_serverMatchEnded && (health == null || health.CurrentHealth > 0))
             serverReloadRequested = true;
     }
 
     [ServerRpc]
     private void RequestDashServerRpc(Vector3 aimWorld)
     {
-        if (s_serverMatchEnded)
+        if (s_serverMatchEnded || (health != null && health.CurrentHealth <= 0))
             return;
 
         serverAimWorld = aimWorld;
@@ -605,6 +646,77 @@ public class LanPlayerAvatar : NetworkBehaviour
     {
         serverMoveInput = moveInput;
         serverAimWorld = aimWorld;
+    }
+
+    private void ServerFreezeAfterDeath()
+    {
+        if (!IsServer)
+            return;
+
+        Vector3 aimWorld = transform.position + transform.right;
+        serverMoveInput = Vector2.zero;
+        serverAimWorld = aimWorld;
+        serverReloadRequested = false;
+        serverDashRequested = false;
+
+        if (playerController != null)
+        {
+            playerController.SetExternalInput(Vector2.zero, aimWorld);
+            playerController.ClearOverrideVelocity();
+        }
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        if (IsOwner)
+            ClearPredictedShots();
+
+        SyncStateFromComponents();
+    }
+
+    private void ServerReviveAtSpawn()
+    {
+        if (!IsServer || s_serverMatchEnded)
+            return;
+
+        Vector3 spawnPosition = GetSpawnPosition(OwnerClientId);
+        transform.position = spawnPosition;
+
+        if (rb != null)
+        {
+            rb.position = spawnPosition;
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        Vector3 aimWorld = spawnPosition + transform.right;
+        serverMoveInput = Vector2.zero;
+        serverAimWorld = aimWorld;
+        serverReloadRequested = false;
+        serverDashRequested = false;
+
+        if (playerController != null)
+        {
+            playerController.SetExternalInput(Vector2.zero, aimWorld);
+            playerController.ClearOverrideVelocity();
+        }
+
+        if (health != null)
+            health.ResetHealth();
+
+        if (shield != null)
+            shield.ResetToMax();
+
+        if (weapon != null)
+            weapon.ResetAmmoToDefaults();
+
+        if (dash != null)
+            dash.ResetChargesToFull();
+
+        SyncStateFromComponents();
     }
 
     private void TryFireAsHost()
