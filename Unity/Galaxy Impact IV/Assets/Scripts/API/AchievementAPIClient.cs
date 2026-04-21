@@ -9,7 +9,7 @@ public class AchievementAPIClient : MonoBehaviour
 {
     public static AchievementAPIClient Instance; // ← Singleton opcional
 
-    public string baseUrl = "http://localhost:8080/api/achievements";
+    private string BaseUrl => ApiConfig.AchievementsUrl;
 
     private void Awake()
     {
@@ -71,7 +71,7 @@ public class AchievementAPIClient : MonoBehaviour
     // ============================================================
     public async Task<bool> SendBatch(AchievementBatchRequest batch)
     {
-        string url = $"{baseUrl}/updateBatch";
+        string url = $"{BaseUrl}/updateBatch";
 
         string json = JsonUtility.ToJson(batch);
         byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
@@ -101,7 +101,7 @@ public class AchievementAPIClient : MonoBehaviour
     // ============================================================
     public async Task<List<AchievementDTO>> GetAchievements(long userId)
     {
-        string url = $"{baseUrl}/user/{userId}";
+        string url = $"{BaseUrl}/user/{userId}";
 
         using UnityWebRequest req = UnityWebRequest.Get(url);
 

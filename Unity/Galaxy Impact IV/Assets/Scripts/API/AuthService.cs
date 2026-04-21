@@ -6,17 +6,13 @@ using System.Threading.Tasks;
 
 public class AuthService : MonoBehaviour
 {
-    private const string LOGIN_URL = "http://25.14.61.56:8080/api/auth/login";
-    private const string REGISTER_URL = "http://25.14.61.56:8080/api/users";
-
-
     public async Task<LoginResponse> Login(string username, string password)
     {
         LoginRequest request = new LoginRequest { username = username, password = password };
         string json = JsonUtility.ToJson(request);
 
 
-        using (UnityWebRequest www = new UnityWebRequest(LOGIN_URL, "POST"))
+        using (UnityWebRequest www = new UnityWebRequest(ApiConfig.AuthLoginUrl, "POST"))
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
             www.uploadHandler = new UploadHandlerRaw(bodyRaw);
@@ -48,7 +44,7 @@ public class AuthService : MonoBehaviour
         string json = JsonUtility.ToJson(request);
 
 
-        using (UnityWebRequest www = new UnityWebRequest(REGISTER_URL, "POST"))
+        using (UnityWebRequest www = new UnityWebRequest(ApiConfig.UsersUrl, "POST"))
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
             www.uploadHandler = new UploadHandlerRaw(bodyRaw);
@@ -75,7 +71,7 @@ public class AuthService : MonoBehaviour
 
     public async System.Threading.Tasks.Task<User> GetUserById(int idUsuario)
     {
-        string url = $"http://25.14.61.56:8080/api/users/{idUsuario}";
+        string url = ApiConfig.UserUrl(idUsuario);
 
         using (UnityWebRequest www = UnityWebRequest.Get(url))
         {
@@ -99,7 +95,7 @@ public class AuthService : MonoBehaviour
     
     public async Task<User> UpdateStats(int idUsuario, int kills, int xpEarned)
     {
-        string url = $"http://25.14.61.56:8080/api/users/{idUsuario}/updateStats";
+        string url = ApiConfig.UserUpdateStatsUrl(idUsuario);
 
         StatsUpdateRequest req = new StatsUpdateRequest
         {
