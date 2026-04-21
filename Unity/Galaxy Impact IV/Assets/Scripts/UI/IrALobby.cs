@@ -3,8 +3,11 @@ using UnityEngine.SceneManagement;
 
 public class IrALobby : MonoBehaviour
 {
+    [SerializeField] private string lobbySceneName = "Lobby";
+
     public void CargarLobby()
     {
-        SceneManager.LoadScene("Lobby");
+        LanSessionLifecycle.ShutdownSession();
+        SceneManager.LoadScene(lobbySceneName);
     }
 }

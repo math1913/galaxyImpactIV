@@ -4,6 +4,13 @@ using UnityEngine.SceneManagement;
 
 public class MainMenuController : MonoBehaviour
 {
+    private const string LoginSceneName = "LoginScene";
+    private const string GameSceneName = "GameScene";
+    private const string SettingsSceneName = "Settings";
+    private const string AchievementsSceneName = "Achievements";
+    private const string LobbySceneName = "Lobby";
+    private const string SelectSkinSceneName = "selectSkin";
+
     [Header("Player Stats UI")]
     public TMP_Text usernameText;
     public TMP_Text levelText;
@@ -26,7 +33,7 @@ public class MainMenuController : MonoBehaviour
         if (userId == -1)
         {
             Debug.LogWarning("No hay userId en PlayerPrefs. Volviendo al Login.");
-            SceneManager.LoadScene("Login");
+            SceneManager.LoadScene(LoginSceneName);
             return;
         }
 
@@ -82,23 +89,34 @@ public class MainMenuController : MonoBehaviour
 
     public void OnStartGame()
     {
-        SceneManager.LoadScene("GameScene"); 
+        SceneManager.LoadScene(GameSceneName);
     }
 
     public void OnSettings()
     {
-        SceneManager.LoadScene("Settings");
+        SceneManager.LoadScene(SettingsSceneName);
     }
 
     public void OnLogros()
     {
-        SceneManager.LoadScene("Achievements");
+        SceneManager.LoadScene(AchievementsSceneName);
+    }
+
+    public void OnLobby()
+    {
+        LanSessionLifecycle.ShutdownSession();
+        SceneManager.LoadScene(LobbySceneName);
+    }
+
+    public void OnSelectSkin()
+    {
+        SceneManager.LoadScene(SelectSkinSceneName);
     }
 
     public void OnLogout()
     {
         PlayerPrefs.DeleteKey("userId");
         PlayerPrefs.Save();
-        SceneManager.LoadScene("LoginScene");
+        SceneManager.LoadScene(LoginSceneName);
     }
 }
