@@ -1,31 +1,41 @@
-using UnityEngine;
 using TMPro;
+using UnityEngine;
 
 public class PlayerIdentity : MonoBehaviour
 {
-    [Header("UI Reference")]
-    public TMP_Text nameTagText;
+    [Header("UI")]
+    [SerializeField] private TMP_Text nameTagText;
+    [SerializeField] private bool applySavedNameOnStart = true;
+    [SerializeField] private string fallbackName = "Jugador";
 
-    void Start()
+    private void Start()
     {
-        // 1. Recuperamos el nombre guardado en PlayerPrefs
-        // Si por alguna razón no hay nada, pondrá "Jugador" por defecto
-        string savedName = PlayerPrefs.GetString("username", "Jugador");
+        if (!applySavedNameOnStart)
+            return;
 
-        // 2. Lo asignamos al componente de texto
-        if (nameTagText != null)
-        {
-            nameTagText.text = savedName;
-        }
+        SetDisplayName(PlayerPrefs.GetString("username", fallbackName));
     }
 
-    void LateUpdate()
+    public void SetDisplayName(string displayName)
     {
-        // Esto evita que el texto gire cuando el jugador rota para apuntar
-        // Mantiene el texto siempre derecho para que sea legible
+        if (nameTagText == null)
+            return;
+
+        string normalized = string.IsNullOrWhiteSpace(displayName) ? fallbackName : displayName.Trim();
+        nameTagText.text = normalized;
+    }
+
+    public void SetVisible(bool visible)
+    {
+        if (nameTagText == null)
+            return;
+
+        nameTagText.gameObject.SetActive(visible);
+    }
+
+    private void LateUpdate()
+    {
         if (nameTagText != null)
-        {
             nameTagText.transform.rotation = Quaternion.identity;
-        }
     }
 }

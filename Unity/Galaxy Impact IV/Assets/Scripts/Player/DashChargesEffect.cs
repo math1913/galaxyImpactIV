@@ -137,4 +137,22 @@ public class DashChargesEffect : MonoBehaviour
     {
         activeColor = filledColor;
     }
+
+    public void ApplyTuning(
+        int tunedMaxCharges,
+        int tunedStartCharges,
+        float tunedDashDistanceUnits,
+        float tunedDashDuration,
+        float tunedDashCooldown,
+        Color tunedActiveColor,
+        Color tunedEmptyColor)
+    {
+        maxCharges = Mathf.Max(1, tunedMaxCharges);
+        charges = Mathf.Clamp(tunedStartCharges, 0, maxCharges);
+        dashDistanceUnits = Mathf.Max(0.01f, tunedDashDistanceUnits);
+        dashDuration = Mathf.Max(0.02f, tunedDashDuration);
+        dashCooldown = Mathf.Max(0f, tunedDashCooldown);
+        activeColor = tunedActiveColor;
+        emptyColor = tunedEmptyColor;
+    }
 }

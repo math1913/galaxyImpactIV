@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -13,7 +12,6 @@ public class LanPlayerAvatar : NetworkBehaviour
     private const string GameplaySceneName = "GameScene";
     private const string GameOverSceneName = "GameOver";
     private const float PredictedShotFallbackSeconds = 1.5f;
-    private const float NameTagWorldOffsetY = 1.35f;
     private const int MaxPlayerNameLength = 24;
 
     private struct PredictedShotState
@@ -65,11 +63,10 @@ public class LanPlayerAvatar : NetworkBehaviour
     private DashChargesEffect dash;
     private BuffManager buffManager;
     private PlayerSkinApplier skinApplier;
+    private PlayerIdentity playerIdentity;
     private Rigidbody2D rb;
     private SpriteRenderer bodyRenderer;
     private Collider2D[] bodyColliders;
-    private TMP_Text nameTagText;
-    private Transform nameTagTransform;
     private Transform currentBoundViewTarget;
     private LanPlayerAvatar currentSpectatorTarget;
     private readonly List<LanPlayerAvatar> spectatorCandidates = new List<LanPlayerAvatar>();
@@ -387,16 +384,12 @@ public class LanPlayerAvatar : NetworkBehaviour
 
     private void ApplyPlayerName(FixedString64Bytes playerName)
     {
-        EnsureNameTag();
-
-        if (nameTagText == null)
-            return;
-
         string displayName = playerName.ToString();
         if (string.IsNullOrWhiteSpace(displayName))
             displayName = $"Player {OwnerClientId}";
 
-        nameTagText.text = displayName;
+        if (playerIdentity != null)
+            playerIdentity.SetDisplayName(displayName);
     }
 
     private void Awake()
@@ -408,12 +401,12 @@ public class LanPlayerAvatar : NetworkBehaviour
         dash = GetComponent<DashChargesEffect>();
         buffManager = GetComponent<BuffManager>();
         skinApplier = GetComponent<PlayerSkinApplier>();
+        playerIdentity = GetComponent<PlayerIdentity>();
         if (skinApplier != null)
             skinApplier.SetApplySavedSkinOnStart(false);
         rb = GetComponent<Rigidbody2D>();
         bodyRenderer = GetComponent<SpriteRenderer>();
         bodyColliders = GetComponents<Collider2D>();
-        EnsureNameTag();
 
         if (health != null)
             health.OnDeath.AddListener(HandleLocalDeath);
@@ -807,15 +800,6 @@ public class LanPlayerAvatar : NetworkBehaviour
         RequestFireServerRpc(localShotSequence, position, rotation);
     }
 
-    private void LateUpdate()
-    {
-        if (nameTagTransform == null)
-            return;
-
-        nameTagTransform.position = transform.position + Vector3.up * NameTagWorldOffsetY;
-        nameTagTransform.rotation = Quaternion.identity;
-    }
-
     private void CleanupPredictedShots()
     {
         if (predictedShots.Count == 0)
@@ -982,36 +966,6 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         if (IsServer)
             ServerHandlePlayerDeath(this);
-    }
-
-    private void EnsureNameTag()
-    {
-        if (nameTagText != null)
-            return;
-
-        TextMeshPro existingNameTag = GetComponentInChildren<TextMeshPro>(true);
-        if (existingNameTag != null && existingNameTag.gameObject.name == "PlayerNameText")
-        {
-            nameTagText = existingNameTag;
-            nameTagTransform = existingNameTag.transform;
-            return;
-        }
-
-        GameObject nameTag = new GameObject("PlayerNameText");
-        nameTag.layer = gameObject.layer;
-        nameTagTransform = nameTag.transform;
-        nameTagTransform.SetParent(transform, false);
-
-        TextMeshPro text = nameTag.AddComponent<TextMeshPro>();
-        text.alignment = TextAlignmentOptions.Center;
-        text.fontSize = 1.2f;
-        text.fontStyle = FontStyles.Bold;
-        text.enableWordWrapping = false;
-        text.color = Color.white;
-        text.sortingOrder = 50;
-        text.rectTransform.sizeDelta = new Vector2(6f, 1.5f);
-
-        nameTagText = text;
     }
 
     private static FixedString64Bytes GetLocalPlayerName()
@@ -1188,8 +1142,8 @@ public class LanPlayerAvatar : NetworkBehaviour
             }
         }
 
-        if (nameTagText != null)
-            nameTagText.gameObject.SetActive(alive);
+        if (playerIdentity != null)
+            playerIdentity.SetVisible(alive);
 
         if (rb != null)
         {
