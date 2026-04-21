@@ -123,7 +123,7 @@ public static class ApiConfig
     {
         public string baseUrl = string.Empty;
         public string protocol = "http";
-        public string serverHost = "127.0.0.1";
+        public string serverHost = "localhost"; //Valor de fallback, se sobreescribe en api-config.json
         public int serverPort = 8080;
         public string apiPath = "api";
     }

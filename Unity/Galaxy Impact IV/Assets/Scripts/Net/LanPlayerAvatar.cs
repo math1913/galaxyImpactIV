@@ -43,6 +43,10 @@ public class LanPlayerAvatar : NetworkBehaviour
     private readonly NetworkVariable<int> syncedMaxDashCharges = new NetworkVariable<int>(0);
     private readonly NetworkVariable<int> syncedWave = new NetworkVariable<int>(0);
     private readonly NetworkVariable<bool> syncedMatchEnded = new NetworkVariable<bool>(false);
+    private readonly NetworkVariable<int> syncedSkinIndex = new NetworkVariable<int>(
+        0,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     private readonly Dictionary<uint, PredictedShotState> predictedShots = new Dictionary<uint, PredictedShotState>();
 
@@ -52,6 +56,7 @@ public class LanPlayerAvatar : NetworkBehaviour
     private Shield shield;
     private DashChargesEffect dash;
     private BuffManager buffManager;
+    private PlayerSkinApplier skinApplier;
     private Rigidbody2D rb;
 
     private Vector2 serverMoveInput;
@@ -289,6 +294,32 @@ public class LanPlayerAvatar : NetworkBehaviour
         s_replicatedMatchEnded = matchEnded;
     }
 
+    private void SetSyncedSkinIndex(int skinIndex)
+    {
+        if (!IsServer)
+            return;
+
+        syncedSkinIndex.Value = PlayerSkinProfile.NormalizeSkinIndex(skinIndex);
+        ApplySkin(syncedSkinIndex.Value);
+    }
+
+    [ServerRpc]
+    private void SubmitSkinSelectionServerRpc(int skinIndex)
+    {
+        SetSyncedSkinIndex(skinIndex);
+    }
+
+    private void HandleSkinChanged(int previousValue, int newValue)
+    {
+        ApplySkin(newValue);
+    }
+
+    private void ApplySkin(int skinIndex)
+    {
+        if (skinApplier != null)
+            skinApplier.ApplySkinIndex(skinIndex);
+    }
+
     private void Awake()
     {
         playerController = GetComponent<PlayerController>();
@@ -297,6 +328,9 @@ public class LanPlayerAvatar : NetworkBehaviour
         shield = GetComponent<Shield>();
         dash = GetComponent<DashChargesEffect>();
         buffManager = GetComponent<BuffManager>();
+        skinApplier = GetComponent<PlayerSkinApplier>();
+        if (skinApplier != null)
+            skinApplier.SetApplySavedSkinOnStart(false);
         rb = GetComponent<Rigidbody2D>();
     }
 
@@ -304,6 +338,9 @@ public class LanPlayerAvatar : NetworkBehaviour
     {
         if (!s_activePlayers.Contains(this))
             s_activePlayers.Add(this);
+
+        syncedSkinIndex.OnValueChanged += HandleSkinChanged;
+        ApplySkin(syncedSkinIndex.Value);
 
         if (weapon != null)
             weapon.SetUseLocalInput(false);
@@ -342,7 +379,15 @@ public class LanPlayerAvatar : NetworkBehaviour
         }
 
         if (IsOwner)
+        {
+            int selectedSkinIndex = PlayerSkinProfile.GetSelectedSkinIndex();
+            if (IsServer)
+                SetSyncedSkinIndex(selectedSkinIndex);
+            else
+                SubmitSkinSelectionServerRpc(selectedSkinIndex);
+
             StartCoroutine(BindLocalSceneReferencesRoutine());
+        }
 
         if (NetworkManager.Singleton != null)
         {
@@ -357,6 +402,7 @@ public class LanPlayerAvatar : NetworkBehaviour
     {
         s_activePlayers.Remove(this);
         SceneManager.sceneLoaded -= OnSceneLoaded;
+        syncedSkinIndex.OnValueChanged -= HandleSkinChanged;
 
         if (IsAuthorityAvatar)
         {
