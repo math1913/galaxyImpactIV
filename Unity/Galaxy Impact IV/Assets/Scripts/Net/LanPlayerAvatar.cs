@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -11,6 +13,8 @@ public class LanPlayerAvatar : NetworkBehaviour
     private const string GameplaySceneName = "GameScene";
     private const string GameOverSceneName = "GameOver";
     private const float PredictedShotFallbackSeconds = 1.5f;
+    private const float NameTagWorldOffsetY = 1.35f;
+    private const int MaxPlayerNameLength = 24;
 
     private struct PredictedShotState
     {
@@ -47,6 +51,10 @@ public class LanPlayerAvatar : NetworkBehaviour
         0,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<FixedString64Bytes> syncedPlayerName = new NetworkVariable<FixedString64Bytes>(
+        new FixedString64Bytes("Jugador"),
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     private readonly Dictionary<uint, PredictedShotState> predictedShots = new Dictionary<uint, PredictedShotState>();
 
@@ -58,6 +66,8 @@ public class LanPlayerAvatar : NetworkBehaviour
     private BuffManager buffManager;
     private PlayerSkinApplier skinApplier;
     private Rigidbody2D rb;
+    private TMP_Text nameTagText;
+    private Transform nameTagTransform;
 
     private Vector2 serverMoveInput;
     private Vector3 serverAimWorld;
@@ -65,6 +75,7 @@ public class LanPlayerAvatar : NetworkBehaviour
     private bool serverDashRequested;
     private uint localShotSequence;
     private float nextPredictedShotTime;
+    private bool deathReported;
 
     public bool IsAlive => health == null || health.CurrentHealth > 0;
     public bool IsAuthorityAvatar => NetworkManager != null && OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
@@ -228,6 +239,9 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (!LanRuntime.IsServer || deadAvatar == null || s_serverMatchEnded)
             return;
 
+        if (HasLivingPlayers())
+            return;
+
         s_serverMatchEnded = true;
         s_replicatedMatchEnded = true;
 
@@ -263,8 +277,9 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         LanSessionLifecycle.MarkLanRunEnded();
 
-        if (authorityAvatar != null)
-            authorityAvatar.StartCoroutine(authorityAvatar.LoadGameOverAfterStatsFrame());
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager != null)
+            networkManager.StartCoroutine(LoadGameOverAfterStatsFrame());
         else
             SceneManager.LoadScene(GameOverSceneName);
     }
@@ -278,6 +293,17 @@ public class LanPlayerAvatar : NetworkBehaviour
         }
 
         return stats;
+    }
+
+    private static bool HasLivingPlayers()
+    {
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer != null && lanPlayer.IsAlive)
+                return true;
+        }
+
+        return false;
     }
 
     private static void ApplyReplicatedWave(int wave)
@@ -320,6 +346,40 @@ public class LanPlayerAvatar : NetworkBehaviour
             skinApplier.ApplySkinIndex(skinIndex);
     }
 
+    private void SetSyncedPlayerName(FixedString64Bytes playerName)
+    {
+        if (!IsServer)
+            return;
+
+        syncedPlayerName.Value = NormalizePlayerName(playerName.ToString());
+        ApplyPlayerName(syncedPlayerName.Value);
+    }
+
+    [ServerRpc]
+    private void SubmitPlayerNameServerRpc(FixedString64Bytes playerName)
+    {
+        SetSyncedPlayerName(playerName);
+    }
+
+    private void HandlePlayerNameChanged(FixedString64Bytes previousValue, FixedString64Bytes newValue)
+    {
+        ApplyPlayerName(newValue);
+    }
+
+    private void ApplyPlayerName(FixedString64Bytes playerName)
+    {
+        EnsureNameTag();
+
+        if (nameTagText == null)
+            return;
+
+        string displayName = playerName.ToString();
+        if (string.IsNullOrWhiteSpace(displayName))
+            displayName = $"Player {OwnerClientId}";
+
+        nameTagText.text = displayName;
+    }
+
     private void Awake()
     {
         playerController = GetComponent<PlayerController>();
@@ -332,6 +392,10 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (skinApplier != null)
             skinApplier.SetApplySavedSkinOnStart(false);
         rb = GetComponent<Rigidbody2D>();
+        EnsureNameTag();
+
+        if (health != null)
+            health.OnDeath.AddListener(HandleLocalDeath);
     }
 
     public override void OnNetworkSpawn()
@@ -340,7 +404,9 @@ public class LanPlayerAvatar : NetworkBehaviour
             s_activePlayers.Add(this);
 
         syncedSkinIndex.OnValueChanged += HandleSkinChanged;
+        syncedPlayerName.OnValueChanged += HandlePlayerNameChanged;
         ApplySkin(syncedSkinIndex.Value);
+        ApplyPlayerName(syncedPlayerName.Value);
 
         if (weapon != null)
             weapon.SetUseLocalInput(false);
@@ -382,9 +448,15 @@ public class LanPlayerAvatar : NetworkBehaviour
         {
             int selectedSkinIndex = PlayerSkinProfile.GetSelectedSkinIndex();
             if (IsServer)
+            {
                 SetSyncedSkinIndex(selectedSkinIndex);
+                SetSyncedPlayerName(GetLocalPlayerName());
+            }
             else
+            {
                 SubmitSkinSelectionServerRpc(selectedSkinIndex);
+                SubmitPlayerNameServerRpc(GetLocalPlayerName());
+            }
 
             StartCoroutine(BindLocalSceneReferencesRoutine());
         }
@@ -403,6 +475,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         s_activePlayers.Remove(this);
         SceneManager.sceneLoaded -= OnSceneLoaded;
         syncedSkinIndex.OnValueChanged -= HandleSkinChanged;
+        syncedPlayerName.OnValueChanged -= HandlePlayerNameChanged;
 
         if (IsAuthorityAvatar)
         {
@@ -417,6 +490,12 @@ public class LanPlayerAvatar : NetworkBehaviour
         }
 
         ClearPredictedShots();
+    }
+
+    private void OnDestroy()
+    {
+        if (health != null)
+            health.OnDeath.RemoveListener(HandleLocalDeath);
     }
 
     private void Update()
@@ -500,7 +579,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         SubmitInputServerRpc(moveInput, aimWorld);
 
         if (fireHeld)
-            TryRequestPredictedShot();
+            TryRequestServerShot();
 
         if (reloadPressed && weapon != null && weapon.CanReload())
         {
@@ -567,12 +646,11 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (NetworkManager == null)
             return;
 
-        if (IsOwner && shooterClientId == NetworkManager.LocalClientId)
+        if (IsOwner && shooterClientId == NetworkManager.LocalClientId && predictedShots.TryGetValue(shotId, out PredictedShotState state))
         {
-            if (predictedShots.TryGetValue(shotId, out PredictedShotState state))
+            if (state.bullet != null)
             {
-                if (state.bullet != null)
-                    state.bullet.SnapTo(muzzlePosition);
+                state.bullet.SnapTo(muzzlePosition);
 
                 state.expiresAt = Time.unscaledTime + projectileLifeTime + PredictedShotFallbackSeconds;
                 predictedShots[shotId] = state;
@@ -662,7 +740,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         weapon.TryFireWithShotId(localShotSequence, position, rotation);
     }
 
-    private void TryRequestPredictedShot()
+    private void TryRequestServerShot()
     {
         if (weapon == null)
             return;
@@ -679,19 +757,16 @@ public class LanPlayerAvatar : NetworkBehaviour
         localShotSequence++;
         nextPredictedShotTime = Time.unscaledTime + weapon.SecondsPerShot;
 
-        weapon.ApplyPredictedShot();
-        weapon.PlayShootSfxLocal(position);
-
-        float cosmeticLifeTime = Mathf.Max(weapon.ProjectileLifeTime + PredictedShotFallbackSeconds, weapon.SecondsPerShot + 0.1f);
-        Bullet cosmeticBullet = weapon.SpawnCosmeticShot(localShotSequence, position, rotation, cosmeticLifeTime);
-
-        predictedShots[localShotSequence] = new PredictedShotState
-        {
-            bullet = cosmeticBullet,
-            expiresAt = Time.unscaledTime + cosmeticLifeTime + PredictedShotFallbackSeconds
-        };
-
         RequestFireServerRpc(localShotSequence, position, rotation);
+    }
+
+    private void LateUpdate()
+    {
+        if (nameTagTransform == null)
+            return;
+
+        nameTagTransform.position = transform.position + Vector3.up * NameTagWorldOffsetY;
+        nameTagTransform.rotation = Quaternion.identity;
     }
 
     private void CleanupPredictedShots()
@@ -836,6 +911,61 @@ public class LanPlayerAvatar : NetworkBehaviour
         ApplyReplicatedWave(0);
     }
 
+    private void HandleLocalDeath()
+    {
+        if (deathReported)
+            return;
+
+        deathReported = true;
+
+        if (IsServer)
+            ServerHandlePlayerDeath(this);
+    }
+
+    private void EnsureNameTag()
+    {
+        if (nameTagText != null)
+            return;
+
+        TextMeshPro existingNameTag = GetComponentInChildren<TextMeshPro>(true);
+        if (existingNameTag != null && existingNameTag.gameObject.name == "PlayerNameText")
+        {
+            nameTagText = existingNameTag;
+            nameTagTransform = existingNameTag.transform;
+            return;
+        }
+
+        GameObject nameTag = new GameObject("PlayerNameText");
+        nameTag.layer = gameObject.layer;
+        nameTagTransform = nameTag.transform;
+        nameTagTransform.SetParent(transform, false);
+
+        TextMeshPro text = nameTag.AddComponent<TextMeshPro>();
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 1.2f;
+        text.fontStyle = FontStyles.Bold;
+        text.enableWordWrapping = false;
+        text.color = Color.white;
+        text.sortingOrder = 50;
+        text.rectTransform.sizeDelta = new Vector2(6f, 1.5f);
+
+        nameTagText = text;
+    }
+
+    private static FixedString64Bytes GetLocalPlayerName()
+    {
+        return NormalizePlayerName(PlayerPrefs.GetString("username", "Jugador"));
+    }
+
+    private static FixedString64Bytes NormalizePlayerName(string playerName)
+    {
+        string normalized = string.IsNullOrWhiteSpace(playerName) ? "Jugador" : playerName.Trim();
+        if (normalized.Length > MaxPlayerNameLength)
+            normalized = normalized.Substring(0, MaxPlayerNameLength);
+
+        return new FixedString64Bytes(normalized);
+    }
+
     private Vector3 GetSpawnPosition(ulong clientId)
     {
         float angle = (clientId % 8) * 45f * Mathf.Deg2Rad;
@@ -916,7 +1046,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         RejectShotClientRpc(shotId, targetParams);
     }
 
-    private IEnumerator LoadGameOverAfterStatsFrame()
+    private static IEnumerator LoadGameOverAfterStatsFrame()
     {
         yield return null;
 
