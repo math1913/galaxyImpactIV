@@ -116,6 +116,8 @@ public class EnemyController : NetworkBehaviour
         if (touchTimer > 0f)
             touchTimer -= Time.deltaTime;
 
+        RefreshLanTargetIfNeeded();
+
         if (destSetter != null)
             target = destSetter.target;
 
@@ -124,6 +126,17 @@ public class EnemyController : NetworkBehaviour
 
         if (LanRuntime.IsServer)
             SyncNetworkHealth();
+    }
+
+    private void RefreshLanTargetIfNeeded()
+    {
+        if (!LanRuntime.IsServer || destSetter == null)
+            return;
+
+        if (destSetter.target != null && (!destSetter.target.TryGetComponent(out LanPlayerAvatar targetLanPlayer) || targetLanPlayer.IsAlive))
+            return;
+
+        destSetter.target = LanPlayerAvatar.GetClosestPlayerTransform(transform.position);
     }
 
     private void RotateTowardsTarget()
