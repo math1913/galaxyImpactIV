@@ -25,6 +25,7 @@ public class LoginUIController : MonoBehaviour
         if (response.status == 200)
         {
             PlayerPrefs.SetInt("userId", response.id);
+            PlayerPrefs.SetString("username", response.user);
             PlayerPrefs.Save();
             StartCoroutine(LoginCorrecto());
         }

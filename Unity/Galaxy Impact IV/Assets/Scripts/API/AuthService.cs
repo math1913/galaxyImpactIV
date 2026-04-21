@@ -6,13 +6,18 @@ using System.Threading.Tasks;
 
 public class AuthService : MonoBehaviour
 {
+    private static string LoginUrl => ApiConfig.AuthLoginUrl;
+    private static string RegisterUrl => ApiConfig.UsersUrl;
+
     public async Task<LoginResponse> Login(string username, string password)
     {
         LoginRequest request = new LoginRequest { username = username, password = password };
         string json = JsonUtility.ToJson(request);
+        string url = LoginUrl;
 
+        Debug.Log("Login URL: " + url);
 
-        using (UnityWebRequest www = new UnityWebRequest(ApiConfig.AuthLoginUrl, "POST"))
+        using (UnityWebRequest www = new UnityWebRequest(url, "POST"))
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
             www.uploadHandler = new UploadHandlerRaw(bodyRaw);
@@ -42,9 +47,11 @@ public class AuthService : MonoBehaviour
     {
         RegisterRequest request = new RegisterRequest { username = username, email = email, password = password };
         string json = JsonUtility.ToJson(request);
+        string url = RegisterUrl;
 
+        Debug.Log("Register URL: " + url);
 
-        using (UnityWebRequest www = new UnityWebRequest(ApiConfig.UsersUrl, "POST"))
+        using (UnityWebRequest www = new UnityWebRequest(url, "POST"))
         {
             byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
             www.uploadHandler = new UploadHandlerRaw(bodyRaw);

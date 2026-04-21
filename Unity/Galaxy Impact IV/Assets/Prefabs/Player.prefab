@@ -294,7 +294,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6832996025636356873}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 78a9cf851e9560845b7ff5e9cbbe4d45, type: 3}
+  m_Script: {fileID: 11500000, guid: 3ecb25e78614f394a8f4d72e38ae169c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 3
@@ -330,7 +330,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6832996025636356873}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c1c11d8416226a2469df835a0d66878d, type: 3}
+  m_Script: {fileID: 11500000, guid: 7b3b3a41d9585e64a8e7ae5f5ca980dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!114 &1353696713022304363
@@ -354,7 +354,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 6832996025636356873}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: cbdffa704c832b94ba9173347973346b, type: 3}
+  m_Script: {fileID: 11500000, guid: a4ec7ffa8976155498090cb712a723b3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   dashKey: 304

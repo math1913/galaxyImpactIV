@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
+using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -11,6 +13,8 @@ public class LanPlayerAvatar : NetworkBehaviour
     private const string GameplaySceneName = "GameScene";
     private const string GameOverSceneName = "GameOver";
     private const float PredictedShotFallbackSeconds = 1.5f;
+    private const float NameTagWorldOffsetY = 1.35f;
+    private const int MaxPlayerNameLength = 24;
 
     private struct PredictedShotState
     {
@@ -47,6 +51,10 @@ public class LanPlayerAvatar : NetworkBehaviour
         0,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
+    private readonly NetworkVariable<FixedString64Bytes> syncedPlayerName = new NetworkVariable<FixedString64Bytes>(
+        new FixedString64Bytes("Jugador"),
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     private readonly Dictionary<uint, PredictedShotState> predictedShots = new Dictionary<uint, PredictedShotState>();
 
@@ -58,6 +66,13 @@ public class LanPlayerAvatar : NetworkBehaviour
     private BuffManager buffManager;
     private PlayerSkinApplier skinApplier;
     private Rigidbody2D rb;
+    private SpriteRenderer bodyRenderer;
+    private Collider2D[] bodyColliders;
+    private TMP_Text nameTagText;
+    private Transform nameTagTransform;
+    private Transform currentBoundViewTarget;
+    private LanPlayerAvatar currentSpectatorTarget;
+    private readonly List<LanPlayerAvatar> spectatorCandidates = new List<LanPlayerAvatar>();
 
     private Vector2 serverMoveInput;
     private Vector3 serverAimWorld;
@@ -65,6 +80,7 @@ public class LanPlayerAvatar : NetworkBehaviour
     private bool serverDashRequested;
     private uint localShotSequence;
     private float nextPredictedShotTime;
+    private bool deathReported;
 
     public bool IsAlive => health == null || health.CurrentHealth > 0;
     public bool IsAuthorityAvatar => NetworkManager != null && OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
@@ -160,6 +176,20 @@ public class LanPlayerAvatar : NetworkBehaviour
         }
     }
 
+    public static void ServerRespawnDeadPlayers()
+    {
+        if (!LanRuntime.IsServer || s_serverMatchEnded)
+            return;
+
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer == null || lanPlayer.IsAlive)
+                continue;
+
+            lanPlayer.ServerRespawn();
+        }
+    }
+
     public static void ServerRecordEnemyKill(ulong killerClientId, EnemyController.EnemyType enemyType, int xpGained)
     {
         if (!LanRuntime.IsServer || killerClientId == ulong.MaxValue)
@@ -228,6 +258,9 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (!LanRuntime.IsServer || deadAvatar == null || s_serverMatchEnded)
             return;
 
+        if (HasLivingPlayers())
+            return;
+
         s_serverMatchEnded = true;
         s_replicatedMatchEnded = true;
 
@@ -263,8 +296,9 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         LanSessionLifecycle.MarkLanRunEnded();
 
-        if (authorityAvatar != null)
-            authorityAvatar.StartCoroutine(authorityAvatar.LoadGameOverAfterStatsFrame());
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager != null)
+            networkManager.StartCoroutine(LoadGameOverAfterStatsFrame());
         else
             SceneManager.LoadScene(GameOverSceneName);
     }
@@ -278,6 +312,17 @@ public class LanPlayerAvatar : NetworkBehaviour
         }
 
         return stats;
+    }
+
+    private static bool HasLivingPlayers()
+    {
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer != null && lanPlayer.IsAlive)
+                return true;
+        }
+
+        return false;
     }
 
     private static void ApplyReplicatedWave(int wave)
@@ -320,6 +365,40 @@ public class LanPlayerAvatar : NetworkBehaviour
             skinApplier.ApplySkinIndex(skinIndex);
     }
 
+    private void SetSyncedPlayerName(FixedString64Bytes playerName)
+    {
+        if (!IsServer)
+            return;
+
+        syncedPlayerName.Value = NormalizePlayerName(playerName.ToString());
+        ApplyPlayerName(syncedPlayerName.Value);
+    }
+
+    [ServerRpc]
+    private void SubmitPlayerNameServerRpc(FixedString64Bytes playerName)
+    {
+        SetSyncedPlayerName(playerName);
+    }
+
+    private void HandlePlayerNameChanged(FixedString64Bytes previousValue, FixedString64Bytes newValue)
+    {
+        ApplyPlayerName(newValue);
+    }
+
+    private void ApplyPlayerName(FixedString64Bytes playerName)
+    {
+        EnsureNameTag();
+
+        if (nameTagText == null)
+            return;
+
+        string displayName = playerName.ToString();
+        if (string.IsNullOrWhiteSpace(displayName))
+            displayName = $"Player {OwnerClientId}";
+
+        nameTagText.text = displayName;
+    }
+
     private void Awake()
     {
         playerController = GetComponent<PlayerController>();
@@ -332,6 +411,12 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (skinApplier != null)
             skinApplier.SetApplySavedSkinOnStart(false);
         rb = GetComponent<Rigidbody2D>();
+        bodyRenderer = GetComponent<SpriteRenderer>();
+        bodyColliders = GetComponents<Collider2D>();
+        EnsureNameTag();
+
+        if (health != null)
+            health.OnDeath.AddListener(HandleLocalDeath);
     }
 
     public override void OnNetworkSpawn()
@@ -339,8 +424,13 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (!s_activePlayers.Contains(this))
             s_activePlayers.Add(this);
 
+        currentBoundViewTarget = null;
+        currentSpectatorTarget = null;
+
         syncedSkinIndex.OnValueChanged += HandleSkinChanged;
+        syncedPlayerName.OnValueChanged += HandlePlayerNameChanged;
         ApplySkin(syncedSkinIndex.Value);
+        ApplyPlayerName(syncedPlayerName.Value);
 
         if (weapon != null)
             weapon.SetUseLocalInput(false);
@@ -370,21 +460,29 @@ public class LanPlayerAvatar : NetworkBehaviour
 
             serverAimWorld = transform.position + transform.right;
             SyncStateFromComponents();
+            SetAlivePresentation(true);
         }
         else if (rb != null)
         {
             rb.linearVelocity = Vector2.zero;
             rb.angularVelocity = 0f;
             rb.simulated = false;
+            SetAlivePresentation(true);
         }
 
         if (IsOwner)
         {
             int selectedSkinIndex = PlayerSkinProfile.GetSelectedSkinIndex();
             if (IsServer)
+            {
                 SetSyncedSkinIndex(selectedSkinIndex);
+                SetSyncedPlayerName(GetLocalPlayerName());
+            }
             else
+            {
                 SubmitSkinSelectionServerRpc(selectedSkinIndex);
+                SubmitPlayerNameServerRpc(GetLocalPlayerName());
+            }
 
             StartCoroutine(BindLocalSceneReferencesRoutine());
         }
@@ -403,6 +501,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         s_activePlayers.Remove(this);
         SceneManager.sceneLoaded -= OnSceneLoaded;
         syncedSkinIndex.OnValueChanged -= HandleSkinChanged;
+        syncedPlayerName.OnValueChanged -= HandlePlayerNameChanged;
 
         if (IsAuthorityAvatar)
         {
@@ -419,6 +518,12 @@ public class LanPlayerAvatar : NetworkBehaviour
         ClearPredictedShots();
     }
 
+    private void OnDestroy()
+    {
+        if (health != null)
+            health.OnDeath.RemoveListener(HandleLocalDeath);
+    }
+
     private void Update()
     {
         if (!IsGameplaySceneLoaded())
@@ -432,26 +537,39 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         if (IsServer)
         {
+            bool canControl = !s_serverMatchEnded && (health == null || health.CurrentHealth > 0);
+
             if (playerController != null)
-                playerController.SetExternalInput(serverMoveInput, serverAimWorld);
+                playerController.SetExternalInput(canControl ? serverMoveInput : Vector2.zero, serverAimWorld);
 
-            if (!s_serverMatchEnded)
+            if (!canControl)
             {
-                if (serverReloadRequested && weapon != null)
-                {
-                    weapon.Reload();
-                    serverReloadRequested = false;
-                }
-
-                if (serverDashRequested && dash != null)
-                {
-                    dash.TryDashTowards(serverAimWorld);
-                    serverDashRequested = false;
-                }
-            }
-            else
-            {
+                serverMoveInput = Vector2.zero;
                 serverReloadRequested = false;
+                serverDashRequested = false;
+
+                if (playerController != null)
+                    playerController.ClearOverrideVelocity();
+
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector2.zero;
+                    rb.angularVelocity = 0f;
+                }
+
+                SyncStateFromComponents();
+                return;
+            }
+
+            if (serverReloadRequested && weapon != null)
+            {
+                weapon.Reload();
+                serverReloadRequested = false;
+            }
+
+            if (serverDashRequested && dash != null)
+            {
+                dash.TryDashTowards(serverAimWorld);
                 serverDashRequested = false;
             }
 
@@ -464,8 +582,16 @@ public class LanPlayerAvatar : NetworkBehaviour
 
     private void CaptureOwnerInput()
     {
-        if (MatchEnded || (health != null && health.CurrentHealth <= 0))
+        if (MatchEnded)
             return;
+
+        if (health != null && health.CurrentHealth <= 0)
+        {
+            UpdateSpectatorViewFromInput();
+            return;
+        }
+
+        BindLocalViewTarget(transform);
 
         Vector2 moveInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical")).normalized;
         Vector3 aimWorld = transform.position + transform.right;
@@ -500,7 +626,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         SubmitInputServerRpc(moveInput, aimWorld);
 
         if (fireHeld)
-            TryRequestPredictedShot();
+            TryRequestServerShot();
 
         if (reloadPressed && weapon != null && weapon.CanReload())
         {
@@ -567,12 +693,11 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (NetworkManager == null)
             return;
 
-        if (IsOwner && shooterClientId == NetworkManager.LocalClientId)
+        if (IsOwner && shooterClientId == NetworkManager.LocalClientId && predictedShots.TryGetValue(shotId, out PredictedShotState state))
         {
-            if (predictedShots.TryGetValue(shotId, out PredictedShotState state))
+            if (state.bullet != null)
             {
-                if (state.bullet != null)
-                    state.bullet.SnapTo(muzzlePosition);
+                state.bullet.SnapTo(muzzlePosition);
 
                 state.expiresAt = Time.unscaledTime + projectileLifeTime + PredictedShotFallbackSeconds;
                 predictedShots[shotId] = state;
@@ -662,7 +787,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         weapon.TryFireWithShotId(localShotSequence, position, rotation);
     }
 
-    private void TryRequestPredictedShot()
+    private void TryRequestServerShot()
     {
         if (weapon == null)
             return;
@@ -679,19 +804,16 @@ public class LanPlayerAvatar : NetworkBehaviour
         localShotSequence++;
         nextPredictedShotTime = Time.unscaledTime + weapon.SecondsPerShot;
 
-        weapon.ApplyPredictedShot();
-        weapon.PlayShootSfxLocal(position);
-
-        float cosmeticLifeTime = Mathf.Max(weapon.ProjectileLifeTime + PredictedShotFallbackSeconds, weapon.SecondsPerShot + 0.1f);
-        Bullet cosmeticBullet = weapon.SpawnCosmeticShot(localShotSequence, position, rotation, cosmeticLifeTime);
-
-        predictedShots[localShotSequence] = new PredictedShotState
-        {
-            bullet = cosmeticBullet,
-            expiresAt = Time.unscaledTime + cosmeticLifeTime + PredictedShotFallbackSeconds
-        };
-
         RequestFireServerRpc(localShotSequence, position, rotation);
+    }
+
+    private void LateUpdate()
+    {
+        if (nameTagTransform == null)
+            return;
+
+        nameTagTransform.position = transform.position + Vector3.up * NameTagWorldOffsetY;
+        nameTagTransform.rotation = Quaternion.identity;
     }
 
     private void CleanupPredictedShots()
@@ -785,6 +907,8 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         if (dash != null)
             dash.ApplyStateFromNetwork(syncedDashCharges.Value, syncedMaxDashCharges.Value);
+
+        SetAlivePresentation(!syncedDead.Value);
     }
 
     private IEnumerator BindLocalSceneReferencesRoutine()
@@ -800,11 +924,7 @@ public class LanPlayerAvatar : NetworkBehaviour
             foreach (BuffIconsHUD buffHud in FindObjectsOfType<BuffIconsHUD>())
                 buffHud.BindPlayer(buffManager);
 
-            foreach (CameraFollow2D cameraFollow in FindObjectsOfType<CameraFollow2D>())
-                cameraFollow.BindPlayer(transform);
-
-            foreach (MinimapController minimap in FindObjectsOfType<MinimapController>())
-                minimap.BindPlayer(transform);
+            BindLocalViewTarget(GetPreferredOwnerViewTarget());
 
             yield return null;
         }
@@ -836,6 +956,78 @@ public class LanPlayerAvatar : NetworkBehaviour
         ApplyReplicatedWave(0);
     }
 
+    private void HandleLocalDeath()
+    {
+        if (deathReported)
+            return;
+
+        deathReported = true;
+        serverMoveInput = Vector2.zero;
+        serverReloadRequested = false;
+        serverDashRequested = false;
+        currentSpectatorTarget = null;
+        SetAlivePresentation(false);
+
+        if (playerController != null)
+            playerController.ClearOverrideVelocity();
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        if (IsOwner)
+            UpdateSpectatorViewFromInput();
+
+        if (IsServer)
+            ServerHandlePlayerDeath(this);
+    }
+
+    private void EnsureNameTag()
+    {
+        if (nameTagText != null)
+            return;
+
+        TextMeshPro existingNameTag = GetComponentInChildren<TextMeshPro>(true);
+        if (existingNameTag != null && existingNameTag.gameObject.name == "PlayerNameText")
+        {
+            nameTagText = existingNameTag;
+            nameTagTransform = existingNameTag.transform;
+            return;
+        }
+
+        GameObject nameTag = new GameObject("PlayerNameText");
+        nameTag.layer = gameObject.layer;
+        nameTagTransform = nameTag.transform;
+        nameTagTransform.SetParent(transform, false);
+
+        TextMeshPro text = nameTag.AddComponent<TextMeshPro>();
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 1.2f;
+        text.fontStyle = FontStyles.Bold;
+        text.enableWordWrapping = false;
+        text.color = Color.white;
+        text.sortingOrder = 50;
+        text.rectTransform.sizeDelta = new Vector2(6f, 1.5f);
+
+        nameTagText = text;
+    }
+
+    private static FixedString64Bytes GetLocalPlayerName()
+    {
+        return NormalizePlayerName(PlayerPrefs.GetString("username", "Jugador"));
+    }
+
+    private static FixedString64Bytes NormalizePlayerName(string playerName)
+    {
+        string normalized = string.IsNullOrWhiteSpace(playerName) ? "Jugador" : playerName.Trim();
+        if (normalized.Length > MaxPlayerNameLength)
+            normalized = normalized.Substring(0, MaxPlayerNameLength);
+
+        return new FixedString64Bytes(normalized);
+    }
+
     private Vector3 GetSpawnPosition(ulong clientId)
     {
         float angle = (clientId % 8) * 45f * Mathf.Deg2Rad;
@@ -843,10 +1035,184 @@ public class LanPlayerAvatar : NetworkBehaviour
         return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius;
     }
 
+    private void ServerRespawn()
+    {
+        if (!IsServer || health == null)
+            return;
+
+        deathReported = false;
+        currentSpectatorTarget = null;
+        serverMoveInput = Vector2.zero;
+        serverReloadRequested = false;
+        serverDashRequested = false;
+
+        Vector3 spawnPosition = GetSpawnPosition(OwnerClientId);
+        transform.position = spawnPosition;
+        if (rb != null)
+        {
+            rb.position = spawnPosition;
+            rb.linearVelocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+            rb.simulated = true;
+        }
+
+        if (playerController != null)
+            playerController.ClearOverrideVelocity();
+
+        health.ResetHealth();
+        if (dash != null)
+            dash.ResetChargesToFull();
+
+        SetAlivePresentation(true);
+        SyncStateFromComponents();
+
+        ClientRpcParams targetParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        };
+
+        OwnerRespawnedClientRpc(targetParams);
+    }
+
+    [ClientRpc]
+    private void OwnerRespawnedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        deathReported = false;
+        currentSpectatorTarget = null;
+        SetAlivePresentation(true);
+        BindLocalViewTarget(transform);
+    }
+
+    private Transform GetPreferredOwnerViewTarget()
+    {
+        if (!IsOwner)
+            return transform;
+
+        if (health == null || health.CurrentHealth > 0)
+            return transform;
+
+        RefreshSpectatorCandidates();
+        SelectSpectatorTarget(direction: 0);
+        return currentSpectatorTarget != null ? currentSpectatorTarget.transform : transform;
+    }
+
+    private void UpdateSpectatorViewFromInput()
+    {
+        if (!IsOwner)
+            return;
+
+        RefreshSpectatorCandidates();
+
+        int direction = 0;
+        if (Input.GetKeyDown(KeyCode.Tab))
+            direction = (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)) ? -1 : 1;
+
+        SelectSpectatorTarget(direction);
+
+        Transform target = currentSpectatorTarget != null ? currentSpectatorTarget.transform : transform;
+        BindLocalViewTarget(target);
+    }
+
+    private void RefreshSpectatorCandidates()
+    {
+        spectatorCandidates.Clear();
+
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer == null || lanPlayer == this || !lanPlayer.IsAlive)
+                continue;
+
+            spectatorCandidates.Add(lanPlayer);
+        }
+    }
+
+    private void SelectSpectatorTarget(int direction)
+    {
+        if (spectatorCandidates.Count == 0)
+        {
+            currentSpectatorTarget = null;
+            return;
+        }
+
+        if (currentSpectatorTarget == null || !currentSpectatorTarget.IsAlive)
+        {
+            currentSpectatorTarget = spectatorCandidates[0];
+            return;
+        }
+
+        if (direction == 0)
+            return;
+
+        int currentIndex = spectatorCandidates.IndexOf(currentSpectatorTarget);
+        if (currentIndex < 0)
+        {
+            currentSpectatorTarget = spectatorCandidates[0];
+            return;
+        }
+
+        int nextIndex = (currentIndex + direction + spectatorCandidates.Count) % spectatorCandidates.Count;
+        currentSpectatorTarget = spectatorCandidates[nextIndex];
+    }
+
+    private void BindLocalViewTarget(Transform target)
+    {
+        if (!IsOwner || target == null || currentBoundViewTarget == target)
+            return;
+
+        foreach (CameraFollow2D cameraFollow in FindObjectsOfType<CameraFollow2D>())
+            cameraFollow.BindPlayer(target);
+
+        foreach (MinimapController minimap in FindObjectsOfType<MinimapController>())
+            minimap.BindPlayer(target);
+
+        currentBoundViewTarget = target;
+    }
+
+    private void SetAlivePresentation(bool alive)
+    {
+        if (bodyRenderer != null)
+            bodyRenderer.enabled = alive;
+
+        if (bodyColliders != null)
+        {
+            foreach (Collider2D bodyCollider in bodyColliders)
+            {
+                if (bodyCollider != null)
+                    bodyCollider.enabled = alive;
+            }
+        }
+
+        if (nameTagText != null)
+            nameTagText.gameObject.SetActive(alive);
+
+        if (rb != null)
+        {
+            if (LanRuntime.IsServer)
+                rb.simulated = alive;
+            else
+                rb.simulated = false;
+
+            if (!alive)
+            {
+                rb.linearVelocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+        }
+    }
+
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         if (scene.name == GameplaySceneName)
         {
+            currentBoundViewTarget = null;
+            currentSpectatorTarget = null;
+
             if (IsServer)
             {
                 if (IsAuthorityAvatar)
@@ -916,7 +1282,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         RejectShotClientRpc(shotId, targetParams);
     }
 
-    private IEnumerator LoadGameOverAfterStatsFrame()
+    private static IEnumerator LoadGameOverAfterStatsFrame()
     {
         yield return null;
 

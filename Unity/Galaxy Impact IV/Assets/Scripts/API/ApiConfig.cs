@@ -13,19 +13,7 @@ public static class ApiConfig
     {
         get
         {
-            ApiConfigData config = Config;
-
-            if (!string.IsNullOrWhiteSpace(config.baseUrl))
-                return config.baseUrl.TrimEnd('/');
-
-            string protocol = TrimSlashes(config.protocol).ToLowerInvariant();
-            string host = config.serverHost.Trim();
-            string port = config.serverPort > 0 ? $":{config.serverPort}" : string.Empty;
-            string apiPath = TrimSlashes(config.apiPath);
-
-            return string.IsNullOrEmpty(apiPath)
-                ? $"{protocol}://{host}{port}"
-                : $"{protocol}://{host}{port}/{apiPath}";
+            return BuildBaseUrl(Config);
         }
     }
 
@@ -81,7 +69,10 @@ public static class ApiConfig
         string configPath = Path.Combine(Application.streamingAssetsPath, ConfigFileName);
 
         if (!File.Exists(configPath))
+        {
+            Debug.LogWarning($"No se encontro {configPath}. Usando API fallback: {BuildBaseUrl(config)}");
             return config;
+        }
 
         try
         {
@@ -104,6 +95,8 @@ public static class ApiConfig
 
             if (!string.IsNullOrWhiteSpace(fileConfig.apiPath))
                 config.apiPath = fileConfig.apiPath;
+
+            Debug.Log($"ApiConfig cargado desde {configPath}. BaseUrl: {BuildBaseUrl(config)}");
         }
         catch (Exception ex)
         {
@@ -116,6 +109,21 @@ public static class ApiConfig
     private static string TrimSlashes(string value)
     {
         return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().Trim('/');
+    }
+
+    private static string BuildBaseUrl(ApiConfigData config)
+    {
+        if (!string.IsNullOrWhiteSpace(config.baseUrl))
+            return config.baseUrl.TrimEnd('/');
+
+        string protocol = TrimSlashes(config.protocol).ToLowerInvariant();
+        string host = config.serverHost.Trim();
+        string port = config.serverPort > 0 ? $":{config.serverPort}" : string.Empty;
+        string apiPath = TrimSlashes(config.apiPath);
+
+        return string.IsNullOrEmpty(apiPath)
+            ? $"{protocol}://{host}{port}"
+            : $"{protocol}://{host}{port}/{apiPath}";
     }
 
     [Serializable]
