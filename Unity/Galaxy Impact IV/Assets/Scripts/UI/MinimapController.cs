@@ -9,6 +9,7 @@ public class MinimapController : MonoBehaviour
     [SerializeField] RectTransform dotsParent;
     [SerializeField] Image playerDotPrefab;
     [SerializeField] Image enemyDotPrefab;
+    [SerializeField] Color teammateDotColor = new Color(0.2f, 0.55f, 1f, 0.9f);
 
     [Header("Map Bounds (Background SpriteRenderer)")]
     [SerializeField] SpriteRenderer background;
@@ -20,7 +21,9 @@ public class MinimapController : MonoBehaviour
 
     Image playerDot;
     readonly Dictionary<Transform, Image> enemyDots = new();
+    readonly Dictionary<Transform, Image> teammateDots = new();
     readonly List<Transform> staleEnemyEntries = new();
+    readonly List<Transform> staleTeammateEntries = new();
 
     void Awake()
     {
@@ -42,6 +45,7 @@ public class MinimapController : MonoBehaviour
     {
         EnemyController.OnEnemySpawned -= HandleEnemySpawned;
         EnemyController.OnEnemyDespawned -= HandleEnemyDespawned;
+        ClearTeammateDots();
     }
 
     void LateUpdate()
@@ -66,6 +70,8 @@ public class MinimapController : MonoBehaviour
 
         foreach (var enemy in staleEnemyEntries)
             UnregisterEnemy(enemy);
+
+        UpdateTeammateDots();
     }
 
     public void RegisterEnemy(Transform enemy)
@@ -114,6 +120,7 @@ public class MinimapController : MonoBehaviour
     {
         player = target;
         RefreshEnemiesFromScene();
+        UpdateTeammateDots();
     }
 
     private void HandleEnemySpawned(Transform enemy)
@@ -130,5 +137,68 @@ public class MinimapController : MonoBehaviour
     {
         foreach (var enemy in FindObjectsOfType<EnemyController>(true))
             RegisterEnemy(enemy.transform);
+    }
+
+    private void UpdateTeammateDots()
+    {
+        if (!LanRuntime.IsActive)
+        {
+            ClearTeammateDots();
+            return;
+        }
+
+        staleTeammateEntries.Clear();
+        foreach (var entry in teammateDots)
+            staleTeammateEntries.Add(entry.Key);
+
+        foreach (LanPlayerAvatar avatar in LanPlayerAvatar.ActivePlayers)
+        {
+            if (avatar == null || !avatar.IsAlive)
+                continue;
+
+            Transform teammate = avatar.transform;
+            if (teammate == null || teammate == player)
+                continue;
+
+            if (!teammateDots.TryGetValue(teammate, out Image dot))
+            {
+                dot = Instantiate(playerDotPrefab, dotsParent);
+                dot.raycastTarget = false;
+                dot.color = teammateDotColor;
+                teammateDots.Add(teammate, dot);
+            }
+
+            staleTeammateEntries.Remove(teammate);
+            UpdateDot(dot.rectTransform, teammate.position);
+        }
+
+        foreach (Transform stale in staleTeammateEntries)
+            UnregisterTeammate(stale);
+    }
+
+    private void UnregisterTeammate(Transform teammate)
+    {
+        if (object.ReferenceEquals(teammate, null))
+            return;
+
+        if (!teammateDots.TryGetValue(teammate, out Image dot))
+            return;
+
+        if (dot)
+            Destroy(dot.gameObject);
+
+        teammateDots.Remove(teammate);
+    }
+
+    private void ClearTeammateDots()
+    {
+        foreach (Image dot in teammateDots.Values)
+        {
+            if (dot)
+                Destroy(dot.gameObject);
+        }
+
+        teammateDots.Clear();
+        staleTeammateEntries.Clear();
     }
 }
