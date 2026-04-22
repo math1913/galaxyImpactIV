@@ -22,6 +22,8 @@ public class LanPlayerAvatar : NetworkBehaviour
 
     private static readonly List<LanPlayerAvatar> s_activePlayers = new List<LanPlayerAvatar>();
     private static readonly Dictionary<ulong, LanRunStatsSnapshot> s_serverRunStats = new Dictionary<ulong, LanRunStatsSnapshot>();
+    private static readonly Dictionary<ulong, LanLiveStatsEntry> s_liveStats = new Dictionary<ulong, LanLiveStatsEntry>();
+    private static readonly List<LanLiveStatsEntry> s_liveStatsSnapshot = new List<LanLiveStatsEntry>();
 
     private static bool s_serverMatchEnded;
     private static float s_serverMatchStartTime;
@@ -29,9 +31,11 @@ public class LanPlayerAvatar : NetworkBehaviour
     private static bool s_replicatedMatchEnded;
 
     public static IReadOnlyList<LanPlayerAvatar> ActivePlayers => s_activePlayers;
+    public static IReadOnlyList<LanLiveStatsEntry> LiveStats => s_liveStatsSnapshot;
     public static int CurrentWave => s_replicatedCurrentWave;
     public static bool MatchEnded => s_replicatedMatchEnded;
     public static event Action<int> OnWaveChanged;
+    public static event Action<IReadOnlyList<LanLiveStatsEntry>> OnLiveStatsChanged;
 
     private readonly NetworkVariable<int> syncedHealth = new NetworkVariable<int>(100);
     private readonly NetworkVariable<int> syncedMaxHealth = new NetworkVariable<int>(100);
@@ -92,11 +96,14 @@ public class LanPlayerAvatar : NetworkBehaviour
     {
         s_activePlayers.Clear();
         s_serverRunStats.Clear();
+        s_liveStats.Clear();
+        s_liveStatsSnapshot.Clear();
         s_serverMatchEnded = false;
         s_serverMatchStartTime = 0f;
         s_replicatedCurrentWave = 0;
         s_replicatedMatchEnded = false;
         OnWaveChanged = null;
+        OnLiveStatsChanged = null;
     }
 
     public static Transform GetClosestPlayerTransform(Vector3 position)
@@ -195,6 +202,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         LanRunStatsSnapshot stats = GetOrCreateServerStats(killerClientId);
         stats.RegisterKill(enemyType, xpGained);
         s_serverRunStats[killerClientId] = stats;
+        ServerBroadcastLiveStats(killerClientId);
     }
 
     public static void ServerRecordPickup(ulong collectorClientId, LanPickupType pickupType, int xpAmount = 0)
@@ -311,6 +319,128 @@ public class LanPlayerAvatar : NetworkBehaviour
         return stats;
     }
 
+    private static void ServerBroadcastLiveStats(ulong clientId)
+    {
+        if (!LanRuntime.IsServer || clientId == ulong.MaxValue)
+            return;
+
+        bool isConnected = IsClientConnectedOnServer(clientId);
+        LanLiveStatsEntry entry = BuildServerLiveStatsEntry(clientId, isConnected);
+        ApplyLiveStatsEntry(entry);
+
+        LanPlayerAvatar broadcaster = GetAuthorityAvatar() ?? GetAvatarByClientId(clientId);
+        if (broadcaster != null)
+            broadcaster.ReceiveLiveStatsClientRpc(entry);
+    }
+
+    private static void ServerBroadcastAllLiveStats()
+    {
+        if (!LanRuntime.IsServer)
+            return;
+
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer == null)
+                continue;
+
+            if (!IsClientConnectedOnServer(lanPlayer.OwnerClientId))
+                continue;
+
+            GetOrCreateServerStats(lanPlayer.OwnerClientId);
+            ServerBroadcastLiveStats(lanPlayer.OwnerClientId);
+        }
+    }
+
+    private static void ServerRemoveLiveStats(ulong clientId)
+    {
+        if (!LanRuntime.IsServer || clientId == ulong.MaxValue)
+            return;
+
+        LanLiveStatsEntry entry = new LanLiveStatsEntry
+        {
+            clientId = clientId,
+            playerName = NormalizePlayerName($"Player {clientId}"),
+            killsThisRun = 0,
+            isConnected = false
+        };
+
+        s_serverRunStats.Remove(clientId);
+        ApplyLiveStatsEntry(entry);
+
+        LanPlayerAvatar broadcaster = GetAuthorityAvatar();
+        if (broadcaster != null)
+            broadcaster.ReceiveLiveStatsClientRpc(entry);
+    }
+
+    private static LanLiveStatsEntry BuildServerLiveStatsEntry(ulong clientId, bool isConnected)
+    {
+        LanRunStatsSnapshot stats = GetOrCreateServerStats(clientId);
+        return new LanLiveStatsEntry
+        {
+            clientId = clientId,
+            playerName = GetServerLivePlayerName(clientId),
+            killsThisRun = stats.killsThisRun,
+            isConnected = isConnected
+        };
+    }
+
+    private static FixedString64Bytes GetServerLivePlayerName(ulong clientId)
+    {
+        LanPlayerAvatar avatar = GetAvatarByClientId(clientId);
+        if (avatar != null)
+        {
+            string syncedName = avatar.syncedPlayerName.Value.ToString();
+            if (!string.IsNullOrWhiteSpace(syncedName))
+                return NormalizePlayerName(syncedName);
+        }
+
+        return NormalizePlayerName($"Player {clientId}");
+    }
+
+    private static bool IsClientConnectedOnServer(ulong clientId)
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || !networkManager.IsServer)
+            return true;
+
+        if (clientId == Unity.Netcode.NetworkManager.ServerClientId)
+            return true;
+
+        IReadOnlyList<ulong> connectedClientIds = networkManager.ConnectedClientsIds;
+        for (int i = 0; i < connectedClientIds.Count; i++)
+        {
+            if (connectedClientIds[i] == clientId)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void ApplyLiveStatsEntry(LanLiveStatsEntry entry)
+    {
+        if (entry.clientId == ulong.MaxValue)
+            return;
+
+        if (entry.isConnected)
+            s_liveStats[entry.clientId] = entry;
+        else
+            s_liveStats.Remove(entry.clientId);
+
+        RebuildLiveStatsSnapshot();
+    }
+
+    private static void RebuildLiveStatsSnapshot()
+    {
+        s_liveStatsSnapshot.Clear();
+        foreach (LanLiveStatsEntry entry in s_liveStats.Values)
+        {
+            if (entry.isConnected)
+                s_liveStatsSnapshot.Add(entry);
+        }
+
+        OnLiveStatsChanged?.Invoke(s_liveStatsSnapshot);
+    }
+
     private static bool HasLivingPlayers()
     {
         foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
@@ -370,6 +500,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         syncedPlayerName.Value = NormalizePlayerName(playerName.ToString());
         ApplyPlayerName(syncedPlayerName.Value);
         ApplyPlayerNameClientRpc(syncedPlayerName.Value);
+        ServerBroadcastLiveStats(OwnerClientId);
     }
 
     [ServerRpc]
@@ -400,6 +531,12 @@ public class LanPlayerAvatar : NetworkBehaviour
     private void ApplyPlayerNameClientRpc(FixedString64Bytes playerName)
     {
         ApplyPlayerName(playerName);
+    }
+
+    [ClientRpc]
+    private void ReceiveLiveStatsClientRpc(LanLiveStatsEntry entry)
+    {
+        ApplyLiveStatsEntry(entry);
     }
 
     private void Awake()
@@ -460,10 +597,17 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         if (IsServer)
         {
-            EnsureServerStatsEntry();
-
+            bool initializedMatch = false;
             if (SceneManager.GetActiveScene().name == GameplaySceneName && IsAuthorityAvatar)
+            {
                 InitializeServerMatchState();
+                initializedMatch = true;
+            }
+
+            EnsureServerStatsEntry();
+            ServerBroadcastLiveStats(OwnerClientId);
+            if (!initializedMatch)
+                ServerBroadcastAllLiveStats();
 
             Vector3 spawnPosition = GetSpawnPosition(OwnerClientId);
             transform.position = spawnPosition;
@@ -944,10 +1088,15 @@ public class LanPlayerAvatar : NetworkBehaviour
     private void InitializeServerMatchState()
     {
         s_serverRunStats.Clear();
+        s_liveStats.Clear();
+        s_liveStatsSnapshot.Clear();
         foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
         {
-            if (lanPlayer != null)
+            if (lanPlayer != null && IsClientConnectedOnServer(lanPlayer.OwnerClientId))
+            {
                 s_serverRunStats[lanPlayer.OwnerClientId] = default;
+                ApplyLiveStatsEntry(BuildServerLiveStatsEntry(lanPlayer.OwnerClientId, isConnected: true));
+            }
         }
 
         s_serverMatchEnded = false;
@@ -957,6 +1106,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         syncedMatchEnded.Value = false;
         syncedWave.Value = 0;
         ApplyReplicatedWave(0);
+        ServerBroadcastAllLiveStats();
     }
 
     private void HandleLocalDeath()
@@ -1223,6 +1373,9 @@ public class LanPlayerAvatar : NetworkBehaviour
         NetworkManager networkManager = NetworkManager.Singleton;
         if (!IsOwner || networkManager == null)
             return;
+
+        if (networkManager.IsServer && clientId != networkManager.LocalClientId)
+            ServerRemoveLiveStats(clientId);
 
         if (!networkManager.IsServer && clientId == networkManager.LocalClientId)
             LanSessionLifecycle.ExitToLobby();

@@ -1,4 +1,5 @@
 using Unity.Netcode;
+using Unity.Collections;
 
 public enum LanPickupType : byte
 {
@@ -93,5 +94,21 @@ public struct LanRunStatsSnapshot : INetworkSerializable
     {
         xpThisRun += amount;
         score += amount;
+    }
+}
+
+public struct LanLiveStatsEntry : INetworkSerializable
+{
+    public ulong clientId;
+    public FixedString64Bytes playerName;
+    public int killsThisRun;
+    public bool isConnected;
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+    {
+        serializer.SerializeValue(ref clientId);
+        serializer.SerializeValue(ref playerName);
+        serializer.SerializeValue(ref killsThisRun);
+        serializer.SerializeValue(ref isConnected);
     }
 }
