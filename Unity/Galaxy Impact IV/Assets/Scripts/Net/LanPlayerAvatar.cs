@@ -369,6 +369,7 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         syncedPlayerName.Value = NormalizePlayerName(playerName.ToString());
         ApplyPlayerName(syncedPlayerName.Value);
+        ApplyPlayerNameClientRpc(syncedPlayerName.Value);
     }
 
     [ServerRpc]
@@ -389,7 +390,16 @@ public class LanPlayerAvatar : NetworkBehaviour
             displayName = $"Player {OwnerClientId}";
 
         if (playerIdentity != null)
+        {
+            playerIdentity.EnsureNameTagReady();
             playerIdentity.SetDisplayName(displayName);
+        }
+    }
+
+    [ClientRpc]
+    private void ApplyPlayerNameClientRpc(FixedString64Bytes playerName)
+    {
+        ApplyPlayerName(playerName);
     }
 
     private void Awake()
@@ -402,6 +412,15 @@ public class LanPlayerAvatar : NetworkBehaviour
         buffManager = GetComponent<BuffManager>();
         skinApplier = GetComponent<PlayerSkinApplier>();
         playerIdentity = GetComponent<PlayerIdentity>();
+        if (playerIdentity == null)
+            playerIdentity = gameObject.AddComponent<PlayerIdentity>();
+
+        if (playerIdentity != null)
+        {
+            playerIdentity.SetApplySavedNameOnStart(false);
+            playerIdentity.EnsureNameTagReady();
+        }
+
         if (skinApplier != null)
             skinApplier.SetApplySavedSkinOnStart(false);
         rb = GetComponent<Rigidbody2D>();
@@ -1177,6 +1196,12 @@ public class LanPlayerAvatar : NetworkBehaviour
                 if (rb != null)
                     rb.position = spawnPosition;
             }
+
+            if (playerIdentity != null)
+                playerIdentity.EnsureNameTagReady();
+
+            ApplyPlayerName(syncedPlayerName.Value);
+            SetAlivePresentation(!syncedDead.Value);
 
             if (IsOwner)
                 StartCoroutine(BindLocalSceneReferencesRoutine());
