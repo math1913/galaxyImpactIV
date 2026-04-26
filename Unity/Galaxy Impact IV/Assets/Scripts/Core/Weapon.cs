@@ -13,7 +13,7 @@ public class Weapon : MonoBehaviour
 
     [Header("Stats")]
     [SerializeField] private float fireRate = 10f;
-    [SerializeField] private int magazineSize = 20;
+    [SerializeField] private int magazineSize = 45;
     [SerializeField] private float reloadTime = 1.2f;
     [SerializeField, Range(0f, 8f)] private float spreadDeg = 2f;
 

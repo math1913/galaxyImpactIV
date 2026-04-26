@@ -5,7 +5,7 @@ using UnityEngine;
 [RequireComponent(typeof(Collider2D))]
 public class Bullet : MonoBehaviour
 {
-    [SerializeField] private float speed = 18f;
+    [SerializeField] private float speed = 20f;
     [SerializeField] private int damage = 10;
     [SerializeField] private float lifeTime = 2f;
     [SerializeField] private LayerMask hitMask;

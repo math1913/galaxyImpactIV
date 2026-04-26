@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9db278c881d0494aa3136bd534f950f1, type: 3}
   m_Name: SharedPlayerTuningProfile
   m_EditorClassIdentifier: 
-  moveSpeed: 3
+  moveSpeed: 3.6
   acceleration: 40
   deceleration: 40
   movementMargin: 3
@@ -24,7 +24,7 @@ MonoBehaviour:
   dashActiveColor: {r: 1, g: 1, b: 1, a: 1}
   dashEmptyColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
   fireRate: 3
-  magazineSize: 30
+  magazineSize: 45
   reloadTime: 1.6
   spreadDeg: 0.5
   totalAmmo: 2147483647

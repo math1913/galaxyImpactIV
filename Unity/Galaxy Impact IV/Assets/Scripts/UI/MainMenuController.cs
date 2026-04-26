@@ -47,6 +47,10 @@ public class MainMenuController : MonoBehaviour
     [SerializeField] private Vector2 skinPreviewFramePosition = new Vector2(0f, -400f);
     [Tooltip("Ancho y alto del personaje dentro del fondo.")]
     [SerializeField] private Vector2 skinPreviewImageSize = new Vector2(460f, 530f);
+    [Tooltip("Escala extra solo para la skin default del lobby preview. Usa menos de 1 si se ve mas grande que las demas.")]
+    [SerializeField, Range(0.5f, 1.2f)] private float defaultLobbySkinScale = 0.60f;
+    [Tooltip("Offset extra solo para la skin default del lobby preview. X positivo mueve a la derecha, Y negativo baja.")]
+    [SerializeField] private Vector2 defaultLobbySkinPositionOffset = new Vector2(12f, -35f);
     [Tooltip("Posicion del personaje dentro del fondo.")]
     [SerializeField] private Vector2 skinPreviewImagePosition = new Vector2(0f, -20f);
     [Tooltip("Ancho y alto del panel de usuario y stats.")]
@@ -264,10 +268,11 @@ public class MainMenuController : MonoBehaviour
         skinRect.anchorMin = new Vector2(0.5f, 0.5f);
         skinRect.anchorMax = new Vector2(0.5f, 0.5f);
         skinRect.pivot = new Vector2(0.5f, 0.5f);
-        skinRect.anchoredPosition = skinPreviewImagePosition;
-        skinRect.sizeDelta = SizeOrFallback(skinPreviewImageSize, new Vector2(460f, 530f));
+        int selectedSkinIndex = PlayerSkinProfile.GetSelectedSkinIndex();
+        skinRect.anchoredPosition = GetSkinPreviewImagePosition(selectedSkinIndex);
+        skinRect.sizeDelta = GetSkinPreviewImageSize(selectedSkinIndex);
 
-        skinPreviewImage.sprite = LoadSelectedSkinSprite();
+        skinPreviewImage.sprite = LoadSelectedSkinSprite(selectedSkinIndex);
         skinPreviewImage.preserveAspect = true;
         skinPreviewImage.raycastTarget = false;
         skinPreviewImage.color = Color.white;
@@ -305,9 +310,25 @@ public class MainMenuController : MonoBehaviour
         return previewObject.GetComponent<Image>();
     }
 
-    private Sprite LoadSelectedSkinSprite()
+    private Vector2 GetSkinPreviewImageSize(int skinIndex)
     {
-        int selectedSkinIndex = PlayerSkinProfile.GetSelectedSkinIndex();
+        Vector2 baseSize = SizeOrFallback(skinPreviewImageSize, new Vector2(460f, 530f));
+        if (PlayerSkinProfile.NormalizeSkinIndex(skinIndex) != 0)
+            return baseSize;
+
+        return baseSize * Mathf.Max(0.1f, defaultLobbySkinScale);
+    }
+
+    private Vector2 GetSkinPreviewImagePosition(int skinIndex)
+    {
+        if (PlayerSkinProfile.NormalizeSkinIndex(skinIndex) != 0)
+            return skinPreviewImagePosition;
+
+        return skinPreviewImagePosition + defaultLobbySkinPositionOffset;
+    }
+
+    private Sprite LoadSelectedSkinSprite(int selectedSkinIndex)
+    {
         Sprite lobbySprite = GetLobbySkinSprite(selectedSkinIndex);
         if (lobbySprite != null)
             return lobbySprite;
