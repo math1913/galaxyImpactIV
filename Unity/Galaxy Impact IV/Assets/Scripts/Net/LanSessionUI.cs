@@ -17,6 +17,9 @@ public class LanSessionUI : MonoBehaviour
     [SerializeField] private Button hostButton;
     [SerializeField] private Button joinButton;
     [SerializeField] private Button startMatchButton;
+    [SerializeField] private TMP_Text startMatchButtonLabel;
+    [SerializeField] private string startMatchButtonText = "Start";
+    [SerializeField] private string backToMenuButtonText = "Back to Menu";
 
     [Header("Single Exit Button")]
     [SerializeField] private Button exitButton;
@@ -30,6 +33,7 @@ public class LanSessionUI : MonoBehaviour
     [Header("Scenes")]
     [SerializeField] private string lobbySceneName = "Lobby";
     [SerializeField] private string gameSceneName = "GameScene";
+    [SerializeField] private string mainMenuSceneName = "MainMenu";
 
     private NetworkManager nm;
     private UnityTransport utp;
@@ -67,7 +71,13 @@ public class LanSessionUI : MonoBehaviour
             joinButton.onClick.AddListener(StartClient);
 
         if (startMatchButton != null)
-            startMatchButton.onClick.AddListener(StartMatch);
+        {
+            if (startMatchButtonLabel == null)
+                startMatchButtonLabel = startMatchButton.GetComponentInChildren<TMP_Text>(true);
+
+            startMatchButton.onClick.RemoveAllListeners();
+            startMatchButton.onClick.AddListener(OnPrimaryLobbyButtonPressed);
+        }
 
         if (exitButton != null)
         {
@@ -139,12 +149,26 @@ public class LanSessionUI : MonoBehaviour
     {
         if (!nm.IsHost)
         {
-            SetStatus("Solo el host puede iniciar la partida");
+            BackToMainMenu();
             return;
         }
 
         nm.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
         SetStatus($"Cargando {gameSceneName}...");
+    }
+
+    public void OnPrimaryLobbyButtonPressed()
+    {
+        if (nm != null && nm.IsHost)
+            StartMatch();
+        else
+            BackToMainMenu();
+    }
+
+    private void BackToMainMenu()
+    {
+        LanSessionLifecycle.ShutdownSession();
+        SceneManager.LoadScene(mainMenuSceneName);
     }
 
     private void OnExitPressed()
@@ -209,7 +233,13 @@ public class LanSessionUI : MonoBehaviour
             portInput.interactable = !listening;
 
         if (startMatchButton != null)
-            startMatchButton.gameObject.SetActive(nm.IsHost);
+        {
+            startMatchButton.gameObject.SetActive(true);
+            startMatchButton.interactable = true;
+
+            if (startMatchButtonLabel != null)
+                startMatchButtonLabel.text = nm.IsHost ? startMatchButtonText : backToMenuButtonText;
+        }
 
         bool connected = nm.IsClient || nm.IsServer;
         if (exitButton != null)
