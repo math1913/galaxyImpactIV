@@ -540,6 +540,12 @@ public class LanPlayerAvatar : NetworkBehaviour
         }
     }
 
+    private void ApplyIdentityVisibility()
+    {
+        if (playerIdentity != null)
+            playerIdentity.SetShowHealthBar(!IsOwner);
+    }
+
     [ClientRpc]
     private void ApplyPlayerNameClientRpc(FixedString64Bytes playerName)
     {
@@ -593,6 +599,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         syncedPlayerName.OnValueChanged += HandlePlayerNameChanged;
         ApplySkin(syncedSkinIndex.Value);
         ApplyPlayerName(syncedPlayerName.Value);
+        ApplyIdentityVisibility();
 
         if (weapon != null)
             weapon.SetUseLocalInput(false);
@@ -1364,6 +1371,7 @@ public class LanPlayerAvatar : NetworkBehaviour
                 playerIdentity.EnsureNameTagReady();
 
             ApplyPlayerName(syncedPlayerName.Value);
+            ApplyIdentityVisibility();
             SetAlivePresentation(!syncedDead.Value);
 
             if (IsOwner)
