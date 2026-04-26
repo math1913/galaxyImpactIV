@@ -3658,7 +3658,8 @@ MonoBehaviour:
   pointsFirstWave: 10
   pointsIncreasePerWave: 10
   maxPointsPerWaveCap: 0
-  speedMultiplierPerWave: 1.05
+  speedMultiplierPerWave: 1
+  scaleEnemySpawnsWithPlayerCount: 1
   enemyTypes:
   - prefab: {fileID: 6294728344263907713, guid: fb384aa801d8b7043806eb080b83da03, type: 3}
     spawnChance: 0.8
@@ -4131,6 +4132,7 @@ MonoBehaviour:
   killsThisRun: 0
   xpThisRun: 0
   wavesCompleted: 0
+  currentWaveReached: 0
   xpPerWave: 20
   xpBonusEveryXWaves: 5
   xpBonusAmount: 50
@@ -8641,9 +8643,21 @@ PrefabInstance:
       value: 
       objectReference: {fileID: -889739676950766307, guid: 7b33cad1e88032048b6ff34b1e24b60a, type: 3}
     - target: {fileID: 2809071517921235701, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
+      propertyPath: fireRate
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2809071517921235701, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
+      propertyPath: autoReload
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 2809071517921235701, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
       propertyPath: bulletPool
       value: 
       objectReference: {fileID: 1975873140}
+    - target: {fileID: 2809071517921235701, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
+      propertyPath: magazineSize
+      value: 45
+      objectReference: {fileID: 0}
     - target: {fileID: 3164391240844906060, guid: 8e02eb812277d0849843ead35f2c4afe, type: 3}
       propertyPath: cam
       value: 

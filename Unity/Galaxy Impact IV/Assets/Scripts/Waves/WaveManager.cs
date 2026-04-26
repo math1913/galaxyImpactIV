@@ -112,6 +112,10 @@ public class WaveManager : MonoBehaviour
     [Tooltip("Multiplicador de dificultad por oleada (se puede usar para velocidad, vida, etc).")]
     [SerializeField] private float speedMultiplierPerWave = 1.1f;
 
+    [Header("Escalado multiplayer")]
+    [Tooltip("En LAN, multiplica el presupuesto de enemigos y los maxPerWave por la cantidad de jugadores conectados.")]
+    [SerializeField] private bool scaleEnemySpawnsWithPlayerCount = true;
+
     [Header("Tipos de enemigos")]
     [Tooltip("Lista de tipos de enemigos con probabilidad, ronda mínima, coste y máximo por oleada.")]
     [SerializeField] private List<EnemyEntry> enemyTypes = new List<EnemyEntry>();
@@ -164,6 +168,7 @@ public class WaveManager : MonoBehaviour
     private int enemiesAlive = 0;
     private bool spawning = false;
     private Coroutine waveRoutine;
+    private int currentEnemySpawnPlayerMultiplier = 1;
 
     // Contadores de sistema por muertes
     private int killsSinceLastPickup = 0;
@@ -263,6 +268,8 @@ public class WaveManager : MonoBehaviour
                 pointsThisWave = Mathf.Min(pointsThisWave, maxPointsPerWaveCap);
             //se ajusta segun la dificultad
             pointsThisWave = Mathf.RoundToInt(pointsThisWave * difficulty.pointsMultiplier);
+            currentEnemySpawnPlayerMultiplier = GetEnemySpawnPlayerMultiplier();
+            pointsThisWave *= currentEnemySpawnPlayerMultiplier;
 
             yield return StartCoroutine(SpawnWaveWithPoints(pointsThisWave));
             yield return new WaitUntil(() => enemiesAlive <= 0);
@@ -411,7 +418,7 @@ public class WaveManager : MonoBehaviour
 
             if (enemySpawnCount.TryGetValue(e, out int spawned))
             {
-                if (spawned >= e.maxPerWave)
+                if (spawned >= GetMaxSpawnsForEnemy(e))
                     continue; // ya llegó a su límite por oleada
             }
 
@@ -434,7 +441,7 @@ public class WaveManager : MonoBehaviour
 
             if (enemySpawnCount.TryGetValue(e, out int spawned))
             {
-                if (spawned >= e.maxPerWave)
+                if (spawned >= GetMaxSpawnsForEnemy(e))
                     continue;
             }
             float chance = e.GetEffectiveSpawnChance(currentWave);
@@ -446,6 +453,37 @@ public class WaveManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    private int GetEnemySpawnPlayerMultiplier()
+    {
+        if (!scaleEnemySpawnsWithPlayerCount || !LanRuntime.IsActive)
+            return 1;
+
+        int playerCount = 0;
+        foreach (LanPlayerAvatar lanPlayer in LanPlayerAvatar.ActivePlayers)
+        {
+            if (lanPlayer != null && lanPlayer.IsSpawned)
+                playerCount++;
+        }
+
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager != null && networkManager.IsListening)
+            playerCount = Mathf.Max(playerCount, networkManager.ConnectedClientsIds.Count);
+
+        return Mathf.Max(1, playerCount);
+    }
+
+    private int GetMaxSpawnsForEnemy(EnemyEntry enemy)
+    {
+        if (enemy == null)
+            return 0;
+
+        int baseMax = Mathf.Max(0, enemy.maxPerWave);
+        if (!scaleEnemySpawnsWithPlayerCount || !LanRuntime.IsActive)
+            return baseMax;
+
+        return baseMax * Mathf.Max(1, currentEnemySpawnPlayerMultiplier);
     }
 
     //   SISTEMA 2: PICKUPS POR MUERTES
