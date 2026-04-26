@@ -115,9 +115,10 @@ public class SkinSelectionController : MonoBehaviour
         button.transition = Selectable.Transition.ColorTint;
         ColorBlock colors = button.colors;
         colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(0.86f, 1f, 0.9f, 1f);
-        colors.pressedColor = new Color(0.68f, 0.92f, 0.74f, 1f);
-        colors.selectedColor = new Color(0.86f, 1f, 0.9f, 1f);
+        // Cambiado de verde a lila FF4BFC
+        colors.highlightedColor = new Color(1f, 0.294f, 0.988f, 1f); 
+        colors.pressedColor = new Color(0.8f, 0.235f, 0.792f, 1f);
+        colors.selectedColor = new Color(1f, 0.294f, 0.988f, 1f);
         colors.disabledColor = new Color(0.35f, 0.35f, 0.35f, 0.5f);
         colors.colorMultiplier = 1f;
         colors.fadeDuration = 0.08f;
@@ -214,7 +215,8 @@ public class SkinSelectionController : MonoBehaviour
                 : new Color(0.06f, 0.08f, 0.12f, 0.78f);
             option.Outline.effectColor = isSelected
                 ? SelectedGold
-                : new Color(0.28f, 0.95f, 0.42f, 0.35f);
+                // Cambiado de verde suave a lila suave FF4BFC
+                : new Color(1f, 0.294f, 0.988f, 0.35f); 
             option.Label.color = isSelected
                 ? SelectedGold
                 : new Color(0.92f, 0.94f, 0.98f, 1f);
@@ -276,7 +278,8 @@ public class SkinSelectionController : MonoBehaviour
         rect.sizeDelta = new Vector2(0f, 64f);
 
         Image image = go.GetComponent<Image>();
-        image.color = new Color(0.36f, 0.96f, 0.48f, 0.92f);
+        // Cambiado de verde a lila FF4BFC
+        image.color = new Color(1f, 0.294f, 0.988f, 0.92f);
 
         Button button = go.GetComponent<Button>();
         button.targetGraphic = image;
