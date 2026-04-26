@@ -39,4 +39,13 @@ public class PlayerSkinApplier : MonoBehaviour
         if (skin != null)
             targetRenderer.sprite = skin;
     }
+
+    public Sprite GetSkinSprite(int skinIndex)
+    {
+        if (skinSprites == null || skinSprites.Length == 0)
+            return null;
+
+        int normalized = Mathf.Clamp(skinIndex, 0, skinSprites.Length - 1);
+        return skinSprites[normalized];
+    }
 }
