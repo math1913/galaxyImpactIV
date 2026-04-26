@@ -11,5 +11,7 @@ public class PickupHealth : PickupBase
 
         if (LanRuntime.IsActive && player.TryGetComponent(out LanPlayerAvatar lanPlayer))
             LanPlayerAvatar.ServerRecordPickup(lanPlayer.OwnerClientId, LanPickupType.Health);
+        else if (GameStatsManager.Instance != null)
+            GameStatsManager.Instance.RegisterPickup(LanPickupType.Health);
     }
 }

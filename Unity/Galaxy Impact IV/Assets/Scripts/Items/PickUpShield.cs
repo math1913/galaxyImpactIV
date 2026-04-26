@@ -11,6 +11,8 @@ public class PickUpShield : PickupBase
             shield.AddShield(shieldAmount);
             if (LanRuntime.IsActive && player.TryGetComponent(out LanPlayerAvatar lanPlayer))
                 LanPlayerAvatar.ServerRecordPickup(lanPlayer.OwnerClientId, LanPickupType.Shield);
+            else if (GameStatsManager.Instance != null)
+                GameStatsManager.Instance.RegisterPickup(LanPickupType.Shield);
         }
         else
         {

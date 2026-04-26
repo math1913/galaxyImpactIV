@@ -158,6 +158,16 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         authorityAvatar.syncedWave.Value = Mathf.Max(0, wave);
         ApplyReplicatedWave(authorityAvatar.syncedWave.Value);
+
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer == null)
+                continue;
+
+            LanRunStatsSnapshot stats = GetOrCreateServerStats(lanPlayer.OwnerClientId);
+            stats.currentWaveReached = Mathf.Max(stats.currentWaveReached, authorityAvatar.syncedWave.Value);
+            s_serverRunStats[lanPlayer.OwnerClientId] = stats;
+        }
     }
 
     public static void ServerRecordWaveCompleted(int waveNumber)
@@ -277,7 +287,8 @@ public class LanPlayerAvatar : NetworkBehaviour
         if (waveManager != null)
             waveManager.StopWaves();
 
-        int minutesPlayed = Mathf.FloorToInt((Time.unscaledTime - s_serverMatchStartTime) / 60f);
+        int secondsPlayed = Mathf.FloorToInt(Time.unscaledTime - s_serverMatchStartTime);
+        int minutesPlayed = Mathf.FloorToInt(secondsPlayed / 60f);
 
         foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
         {
@@ -285,7 +296,9 @@ public class LanPlayerAvatar : NetworkBehaviour
                 continue;
 
             LanRunStatsSnapshot stats = GetOrCreateServerStats(lanPlayer.OwnerClientId);
+            stats.secondsPlayed = Mathf.Max(0, secondsPlayed);
             stats.minutesPlayed = Mathf.Max(0, minutesPlayed);
+            stats.currentWaveReached = Mathf.Max(stats.currentWaveReached, s_replicatedCurrentWave);
             s_serverRunStats[lanPlayer.OwnerClientId] = stats;
 
             ClientRpcParams targetParams = new ClientRpcParams

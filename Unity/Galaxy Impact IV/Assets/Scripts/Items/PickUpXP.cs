@@ -14,6 +14,7 @@ public class PickupXP : PickupBase
 
         if (GameStatsManager.Instance != null)
         {
+            GameStatsManager.Instance.RegisterPickup(LanPickupType.Exp);
             GameStatsManager.Instance.AddXP(xpAmount);
         }
         else
