@@ -213,7 +213,7 @@ SpriteRenderer:
   m_SortingLayer: -1
   m_SortingOrder: -100
   m_Sprite: {fileID: -408327487947842520, guid: b9d3e60148f0d944cbcee90383cd6d52, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_Color: {r: 1, g: 0.29411766, b: 0.9882353, a: 1}
   m_FlipX: 0
   m_FlipY: 0
   m_DrawMode: 0
@@ -1513,6 +1513,7 @@ MonoBehaviour:
   dotsParent: {fileID: 0}
   playerDotPrefab: {fileID: 7154715751353929312, guid: 9bc96a74b3830154495accbafad79d12, type: 3}
   enemyDotPrefab: {fileID: 3045408076971141995, guid: c40a6941925645747ae365836eec5195, type: 3}
+  teammateDotColor: {r: 0.2, g: 0.55, b: 1, a: 0.9}
   background: {fileID: 45101324}
   player: {fileID: 155139138}
   edgeMarginNormalized: 0.02
@@ -2044,7 +2045,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.34509805, g: 0.7960785, b: 0.45882356, a: 0.6}
+  m_Color: {r: 1, g: 0.29411766, b: 0.9882353, a: 0.6}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5070,7 +5071,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.4117647, g: 0.9529412, b: 0.5529412, a: 0.6}
+  m_Color: {r: 1, g: 0.29411766, b: 0.9882353, a: 0.6}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -5161,8 +5162,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4294901916
-  m_fontColor: {r: 0.6122818, g: 0, b: 1, a: 1}
+    rgba: 4294967295
+  m_fontColor: {r: 1, g: 1, b: 1, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
