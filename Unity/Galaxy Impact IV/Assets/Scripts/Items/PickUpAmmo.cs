@@ -14,6 +14,8 @@ public class PickupAmmo : PickupBase
             weapon.AddAmmo(ammoAmount);
             if (LanRuntime.IsActive && player.TryGetComponent(out LanPlayerAvatar lanPlayer))
                 LanPlayerAvatar.ServerRecordPickup(lanPlayer.OwnerClientId, LanPickupType.Ammo);
+            else if (GameStatsManager.Instance != null)
+                GameStatsManager.Instance.RegisterPickup(LanPickupType.Ammo);
         }
     }
 }

@@ -198,7 +198,10 @@ public class WaveManager : MonoBehaviour
         if (minKillsForPickup < 1) minKillsForPickup = 1;
         if (maxKillsForPickup < minKillsForPickup) maxKillsForPickup = minKillsForPickup;
         if (!LanRuntime.IsActive && GameStatsManager.Instance != null)
+        {
+            OnWaveStarted.AddListener(GameStatsManager.Instance.OnWaveStarted);
             OnWaveCompleted.AddListener(GameStatsManager.Instance.OnWaveCompleted);
+        }
         ResetPickupKillThreshold();
 
         waveRoutine = StartCoroutine(WaveLoop());

@@ -2,9 +2,31 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
+public struct GameRunStatsSnapshot
+{
+    public int killsNormal;
+    public int killsFast;
+    public int killsTank;
+    public int killsShooter;
+    public int minutesPlayed;
+    public float timePlayed;
+    public int pickupHealth;
+    public int pickupShield;
+    public int pickupAmmo;
+    public int pickupExp;
+    public int score;
+    public int killsThisRun;
+    public int xpThisRun;
+    public int wavesCompleted;
+    public int currentWaveReached;
+}
+
 public class GameStatsManager : MonoBehaviour
 {
     public static GameStatsManager Instance { get; private set; }
+
+    public static bool HasLastRunSnapshot { get; private set; }
+    public static GameRunStatsSnapshot LastRunSnapshot { get; private set; }
 
     private static bool s_hasPendingLanSnapshot;
     private static LanRunStatsSnapshot s_pendingLanSnapshot;
@@ -31,6 +53,7 @@ public class GameStatsManager : MonoBehaviour
     public int killsThisRun = 0;
     public int xpThisRun = 0;
     public int wavesCompleted = 0;
+    public int currentWaveReached = 0;
 
     [Header("Config XP por ronda")]
     [Tooltip("XP base que se da al completar cada ronda.")]
@@ -90,6 +113,28 @@ public class GameStatsManager : MonoBehaviour
         scoreThisRun += xpGained;
     }
 
+    public void RegisterPickup(LanPickupType pickupType)
+    {
+        if (LanRuntime.IsActive)
+            return;
+
+        switch (pickupType)
+        {
+            case LanPickupType.Health:
+                pickupHealth++;
+                break;
+            case LanPickupType.Shield:
+                pickupShield++;
+                break;
+            case LanPickupType.Ammo:
+                pickupAmmo++;
+                break;
+            case LanPickupType.Exp:
+                pickupExp++;
+                break;
+        }
+    }
+
     public void AddXP(int amount)
     {
         if (LanRuntime.IsActive)
@@ -99,13 +144,24 @@ public class GameStatsManager : MonoBehaviour
         scoreThisRun += amount;
     }
 
+    public void OnWaveStarted(int waveNumber)
+    {
+        if (LanRuntime.IsActive)
+            return;
+
+        currentWaveReached = Mathf.Max(currentWaveReached, waveNumber);
+    }
+
     public void OnWaveCompleted(int waveNumber)
     {
         if (LanRuntime.IsActive)
             return;
 
+        currentWaveReached = Mathf.Max(currentWaveReached, waveNumber);
+        int xpReward = GetWaveXpReward(waveNumber);
         wavesCompleted = waveNumber;
-        xpThisRun += GetWaveXpReward(waveNumber);
+        xpThisRun += xpReward;
+        scoreThisRun += xpReward;
     }
 
     public int GetWaveXpReward(int waveNumber)
@@ -119,8 +175,41 @@ public class GameStatsManager : MonoBehaviour
 
     public async Task EndRunAndSendToApi()
     {
+        FinalizeRun();
         SceneManager.LoadScene("GameOver");
         await SendCurrentStatsToApi();
+    }
+
+    public GameRunStatsSnapshot GetSnapshot()
+    {
+        return new GameRunStatsSnapshot
+        {
+            killsNormal = killsNormal,
+            killsFast = killsFast,
+            killsTank = killsTank,
+            killsShooter = killsShooter,
+            minutesPlayed = minutesPlayed,
+            timePlayed = timePlayed,
+            pickupHealth = pickupHealth,
+            pickupShield = pickupShield,
+            pickupAmmo = pickupAmmo,
+            pickupExp = pickupExp,
+            score = scoreThisRun,
+            killsThisRun = killsThisRun,
+            xpThisRun = xpThisRun,
+            wavesCompleted = wavesCompleted,
+            currentWaveReached = currentWaveReached
+        };
+    }
+
+    public void FinalizeRun()
+    {
+        if (runFinalized)
+            return;
+
+        minutesPlayed = Mathf.FloorToInt(timePlayed / 60f);
+        StoreLastRunSnapshot(GetSnapshot());
+        runFinalized = true;
     }
 
     public async Task SendCurrentStatsToApi()
@@ -186,12 +275,14 @@ public class GameStatsManager : MonoBehaviour
         killsThisRun = snapshot.killsThisRun;
         xpThisRun = snapshot.xpThisRun;
         wavesCompleted = snapshot.wavesCompleted;
-        timePlayed = snapshot.minutesPlayed * 60f;
+        currentWaveReached = Mathf.Max(snapshot.currentWaveReached, snapshot.wavesCompleted);
+        timePlayed = snapshot.secondsPlayed > 0 ? snapshot.secondsPlayed : snapshot.minutesPlayed * 60f;
 
         runFinalized = true;
         lanSnapshotApplied = true;
         s_pendingLanSnapshot = snapshot;
         s_hasPendingLanSnapshot = true;
+        StoreLastRunSnapshot(GetSnapshot());
     }
 
     public async Task ApplyLanFinalSnapshotAndSend(LanRunStatsSnapshot snapshot)
@@ -210,6 +301,7 @@ public class GameStatsManager : MonoBehaviour
         s_pendingLanSnapshot = snapshot;
         s_hasPendingLanSnapshot = true;
         s_pendingLanSnapshotShouldSend = sendToApi;
+        StoreLastRunSnapshot(ToGameRunSnapshot(snapshot));
 
         if (Instance != null)
         {
@@ -239,12 +331,15 @@ public class GameStatsManager : MonoBehaviour
 
         scoreThisRun = 0;
         wavesCompleted = 0;
+        currentWaveReached = 0;
         timePlayed = 0f;
         minutesPlayed = 0;
 
         runFinalized = false;
         lanSnapshotApplied = false;
         lanStatsSent = false;
+        HasLastRunSnapshot = false;
+        LastRunSnapshot = default;
         s_hasPendingLanSnapshot = false;
         s_pendingLanSnapshot = default;
         s_pendingLanSnapshotShouldSend = false;
@@ -257,5 +352,33 @@ public class GameStatsManager : MonoBehaviour
 
         timePlayed += Time.deltaTime;
         minutesPlayed = Mathf.FloorToInt(timePlayed / 60f);
+    }
+
+    private static void StoreLastRunSnapshot(GameRunStatsSnapshot snapshot)
+    {
+        LastRunSnapshot = snapshot;
+        HasLastRunSnapshot = true;
+    }
+
+    private static GameRunStatsSnapshot ToGameRunSnapshot(LanRunStatsSnapshot snapshot)
+    {
+        return new GameRunStatsSnapshot
+        {
+            killsNormal = snapshot.killsNormal,
+            killsFast = snapshot.killsFast,
+            killsTank = snapshot.killsTank,
+            killsShooter = snapshot.killsShooter,
+            minutesPlayed = snapshot.minutesPlayed,
+            timePlayed = snapshot.secondsPlayed > 0 ? snapshot.secondsPlayed : snapshot.minutesPlayed * 60f,
+            pickupHealth = snapshot.pickupHealth,
+            pickupShield = snapshot.pickupShield,
+            pickupAmmo = snapshot.pickupAmmo,
+            pickupExp = snapshot.pickupExp,
+            score = snapshot.score,
+            killsThisRun = snapshot.killsThisRun,
+            xpThisRun = snapshot.xpThisRun,
+            wavesCompleted = snapshot.wavesCompleted,
+            currentWaveReached = Mathf.Max(snapshot.currentWaveReached, snapshot.wavesCompleted)
+        };
     }
 }
