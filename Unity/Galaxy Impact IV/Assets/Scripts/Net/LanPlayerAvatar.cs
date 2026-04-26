@@ -85,6 +85,8 @@ public class LanPlayerAvatar : NetworkBehaviour
 
     public bool IsAlive => health == null || health.CurrentHealth > 0;
     public bool IsAuthorityAvatar => NetworkManager != null && OwnerClientId == Unity.Netcode.NetworkManager.ServerClientId;
+    public int SyncedSkinIndex => PlayerSkinProfile.NormalizeSkinIndex(syncedSkinIndex.Value);
+    public string SyncedDisplayName => syncedPlayerName.Value.ToString();
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticState()
