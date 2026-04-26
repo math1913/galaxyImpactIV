@@ -64,16 +64,47 @@ public class GameOverUI : MonoBehaviour
 
     private void RefreshStatsUI()
     {
-        var stats = GameStatsManager.Instance;
-        if (stats == null)
-            return;
+        GameRunStatsSnapshot stats = ResolveStatsSnapshot();
+        int waveReached = stats.currentWaveReached > 0 ? stats.currentWaveReached : stats.wavesCompleted;
 
-        scoreText.text = stats.scoreThisRun.ToString() + " pts";
-        roundsText.text = stats.wavesCompleted.ToString() + " waves";
-        timeText.text = stats.minutesPlayed.ToString() + " min";
-        killsNormalText.text = stats.killsNormal.ToString() + " kills";
-        killsFastText.text = stats.killsFast.ToString() + " kills";
-        killsTankText.text = stats.killsTank.ToString() + " kills";
-        killsShooterText.text = stats.killsShooter.ToString() + " kills";
+        SetText(scoreText, stats.score + " pts");
+        SetText(roundsText, waveReached + " waves");
+        SetText(timeText, FormatTimeAlive(stats));
+        SetText(killsNormalText, stats.killsNormal + " kills");
+        SetText(killsFastText, stats.killsFast + " kills");
+        SetText(killsTankText, stats.killsTank + " kills");
+        SetText(killsShooterText, stats.killsShooter + " kills");
+    }
+
+    private static GameRunStatsSnapshot ResolveStatsSnapshot()
+    {
+        if (GameStatsManager.Instance != null)
+            return GameStatsManager.Instance.GetSnapshot();
+
+        if (GameStatsManager.HasLastRunSnapshot)
+            return GameStatsManager.LastRunSnapshot;
+
+        return default;
+    }
+
+    private static void SetText(TextMeshProUGUI text, string value)
+    {
+        if (text != null)
+            text.text = value;
+    }
+
+    private static string FormatTimeAlive(GameRunStatsSnapshot stats)
+    {
+        int totalSeconds = Mathf.Max(0, Mathf.FloorToInt(stats.timePlayed));
+        if (totalSeconds == 0 && stats.minutesPlayed > 0)
+            totalSeconds = stats.minutesPlayed * 60;
+
+        int minutes = totalSeconds / 60;
+        int seconds = totalSeconds % 60;
+
+        if (minutes > 0)
+            return minutes + "m " + seconds.ToString("00") + "s";
+
+        return seconds + "s";
     }
 }

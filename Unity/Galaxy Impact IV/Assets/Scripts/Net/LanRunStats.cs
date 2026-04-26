@@ -24,6 +24,8 @@ public struct LanRunStatsSnapshot : INetworkSerializable
     public int wavesCompleted;
     public int xpThisRun;
     public int killsThisRun;
+    public int currentWaveReached;
+    public int secondsPlayed;
 
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
@@ -40,6 +42,8 @@ public struct LanRunStatsSnapshot : INetworkSerializable
         serializer.SerializeValue(ref wavesCompleted);
         serializer.SerializeValue(ref xpThisRun);
         serializer.SerializeValue(ref killsThisRun);
+        serializer.SerializeValue(ref currentWaveReached);
+        serializer.SerializeValue(ref secondsPlayed);
     }
 
     public void RegisterKill(EnemyController.EnemyType enemyType, int xpGained)
@@ -68,7 +72,9 @@ public struct LanRunStatsSnapshot : INetworkSerializable
     public void RegisterWaveCompleted(int waveNumber, int xpReward)
     {
         wavesCompleted = waveNumber;
+        currentWaveReached = waveNumber > currentWaveReached ? waveNumber : currentWaveReached;
         xpThisRun += xpReward;
+        score += xpReward;
     }
 
     public void RegisterPickup(LanPickupType pickupType)
