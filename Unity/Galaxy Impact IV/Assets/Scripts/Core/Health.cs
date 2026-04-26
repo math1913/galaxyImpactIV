@@ -153,6 +153,27 @@ public class Health : MonoBehaviour
     {
         _invulnerable = value;
     }
+
+    public void ApplyTuning(
+        int tunedMaxHealth,
+        AudioClip tunedPlayerDamageSound,
+        AudioClip tunedPlayerDeathSound,
+        float tunedDamageSoundVolume,
+        float tunedDeathSoundVolume)
+    {
+        maxHealth = Mathf.Max(1, tunedMaxHealth);
+        playerDamageSound = tunedPlayerDamageSound;
+        playerDeathSound = tunedPlayerDeathSound;
+        damageSoundVolume = Mathf.Clamp01(tunedDamageSoundVolume);
+        deathSoundVolume = Mathf.Clamp01(tunedDeathSoundVolume);
+
+        if (CurrentHealth > maxHealth)
+        {
+            CurrentHealth = maxHealth;
+            OnHealthChanged?.Invoke(CurrentHealth, maxHealth);
+        }
+    }
+
     private void TriggerDamageFeedback()
     {
         AudioClip clip = damageSound;

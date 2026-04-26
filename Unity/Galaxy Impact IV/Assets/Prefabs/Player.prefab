@@ -78,6 +78,8 @@ GameObject:
   - component: {fileID: 3234133140938968774}
   - component: {fileID: 2198097510065819800}
   - component: {fileID: 867530900100000001}
+  - component: {fileID: 867530900100000003}
+  - component: {fileID: 867530900100000004}
   - component: {fileID: 3959216691023713532}
   - component: {fileID: 2189403322001256956}
   - component: {fileID: 1480989378502689383}
@@ -185,6 +187,35 @@ MonoBehaviour:
   - {fileID: 4481217645491899066, guid: 72e5b2250e97fb3429e379c19cad32f1, type: 3}
   - {fileID: -6166086725479670228, guid: 49c763cc9f081104fa6f67feddfa7eba, type: 3}
   applySavedSkinOnStart: 1
+--- !u!114 &867530900100000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6832996025636356873}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2dd1a828988d524cbdf8fb5926a206e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  nameTagText: {fileID: 456466382201880457}
+  applySavedNameOnStart: 1
+  fallbackName: Jugador
+--- !u!114 &867530900100000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6832996025636356873}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6cda838370b84e26821b84a49ac99335, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  profile: {fileID: 11400000, guid: 43d3c0fdeee8488ba3f6b7a177f58e48, type: 2}
+  applyOnAwake: 1
 --- !u!50 &3959216691023713532
 Rigidbody2D:
   serializedVersion: 5

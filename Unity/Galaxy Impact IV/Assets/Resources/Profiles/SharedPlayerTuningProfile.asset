@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9db278c881d0494aa3136bd534f950f1, type: 3}
+  m_Name: SharedPlayerTuningProfile
+  m_EditorClassIdentifier: 
+  moveSpeed: 3
+  acceleration: 40
+  deceleration: 40
+  movementMargin: 3
+  maxDashCharges: 3
+  startDashCharges: 0
+  dashDistanceUnits: 2
+  dashDuration: 0.1
+  dashCooldown: 0.05
+  dashActiveColor: {r: 1, g: 1, b: 1, a: 1}
+  dashEmptyColor: {r: 0.15, g: 0.15, b: 0.15, a: 1}
+  fireRate: 3
+  magazineSize: 30
+  reloadTime: 1.6
+  spreadDeg: 0.5
+  totalAmmo: 2147483647
+  shootSfx: {fileID: 8300000, guid: b68ca824aec402f4eba8694c79d3ffec, type: 3}
+  reloadStartSfx: {fileID: 8300000, guid: 831a4e19da6bde142902f5c70fee2963, type: 3}
+  reloadCompleteSfx: {fileID: 0}
+  shootVolume: 0.6
+  reloadVolume: 0.6
+  maxHealth: 100
+  playerDamageSfx: {fileID: 8300000, guid: 748d22fd6c8540341b40050f1b5c7523, type: 3}
+  playerDeathSfx: {fileID: 8300000, guid: 9f8d4ffa8baf3d4428449e36f0ab5bda, type: 3}
+  damageVolume: 1
+  deathVolume: 1

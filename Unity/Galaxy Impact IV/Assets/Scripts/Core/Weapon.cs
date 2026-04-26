@@ -223,6 +223,30 @@ public class Weapon : MonoBehaviour
         useLocalInput = value;
     }
 
+    public void ApplyTuning(
+        float tunedFireRate,
+        int tunedMagazineSize,
+        float tunedReloadTime,
+        float tunedSpreadDeg,
+        int tunedTotalAmmo,
+        AudioClip tunedShootSfx,
+        AudioClip tunedReloadStartSfx,
+        AudioClip tunedReloadCompleteSfx,
+        float tunedShootVolume,
+        float tunedReloadVolume)
+    {
+        fireRate = Mathf.Max(0.01f, tunedFireRate);
+        magazineSize = Mathf.Max(1, tunedMagazineSize);
+        reloadTime = Mathf.Max(0f, tunedReloadTime);
+        spreadDeg = Mathf.Clamp(tunedSpreadDeg, 0f, 8f);
+        totalAmmo = Mathf.Max(0, tunedTotalAmmo);
+        shootSfx = tunedShootSfx;
+        reloadStartSfx = tunedReloadStartSfx;
+        reloadCompleteSfx = tunedReloadCompleteSfx;
+        shootVolume = Mathf.Clamp01(tunedShootVolume);
+        reloadVolume = Mathf.Clamp01(tunedReloadVolume);
+    }
+
     public void ApplyStateFromNetwork(int currentAmmo, int totalAmmo, bool reloading)
     {
         bool wasReloading = IsReloading;

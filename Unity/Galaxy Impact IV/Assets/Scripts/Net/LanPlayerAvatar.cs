@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using TMPro;
 using Unity.Collections;
 using Unity.Netcode;
 using UnityEngine;
@@ -13,7 +12,6 @@ public class LanPlayerAvatar : NetworkBehaviour
     private const string GameplaySceneName = "GameScene";
     private const string GameOverSceneName = "GameOver";
     private const float PredictedShotFallbackSeconds = 1.5f;
-    private const float NameTagWorldOffsetY = 1.35f;
     private const int MaxPlayerNameLength = 24;
 
     private struct PredictedShotState
@@ -24,6 +22,8 @@ public class LanPlayerAvatar : NetworkBehaviour
 
     private static readonly List<LanPlayerAvatar> s_activePlayers = new List<LanPlayerAvatar>();
     private static readonly Dictionary<ulong, LanRunStatsSnapshot> s_serverRunStats = new Dictionary<ulong, LanRunStatsSnapshot>();
+    private static readonly Dictionary<ulong, LanLiveStatsEntry> s_liveStats = new Dictionary<ulong, LanLiveStatsEntry>();
+    private static readonly List<LanLiveStatsEntry> s_liveStatsSnapshot = new List<LanLiveStatsEntry>();
 
     private static bool s_serverMatchEnded;
     private static float s_serverMatchStartTime;
@@ -31,9 +31,11 @@ public class LanPlayerAvatar : NetworkBehaviour
     private static bool s_replicatedMatchEnded;
 
     public static IReadOnlyList<LanPlayerAvatar> ActivePlayers => s_activePlayers;
+    public static IReadOnlyList<LanLiveStatsEntry> LiveStats => s_liveStatsSnapshot;
     public static int CurrentWave => s_replicatedCurrentWave;
     public static bool MatchEnded => s_replicatedMatchEnded;
     public static event Action<int> OnWaveChanged;
+    public static event Action<IReadOnlyList<LanLiveStatsEntry>> OnLiveStatsChanged;
 
     private readonly NetworkVariable<int> syncedHealth = new NetworkVariable<int>(100);
     private readonly NetworkVariable<int> syncedMaxHealth = new NetworkVariable<int>(100);
@@ -65,11 +67,10 @@ public class LanPlayerAvatar : NetworkBehaviour
     private DashChargesEffect dash;
     private BuffManager buffManager;
     private PlayerSkinApplier skinApplier;
+    private PlayerIdentity playerIdentity;
     private Rigidbody2D rb;
     private SpriteRenderer bodyRenderer;
     private Collider2D[] bodyColliders;
-    private TMP_Text nameTagText;
-    private Transform nameTagTransform;
     private Transform currentBoundViewTarget;
     private LanPlayerAvatar currentSpectatorTarget;
     private readonly List<LanPlayerAvatar> spectatorCandidates = new List<LanPlayerAvatar>();
@@ -95,11 +96,14 @@ public class LanPlayerAvatar : NetworkBehaviour
     {
         s_activePlayers.Clear();
         s_serverRunStats.Clear();
+        s_liveStats.Clear();
+        s_liveStatsSnapshot.Clear();
         s_serverMatchEnded = false;
         s_serverMatchStartTime = 0f;
         s_replicatedCurrentWave = 0;
         s_replicatedMatchEnded = false;
         OnWaveChanged = null;
+        OnLiveStatsChanged = null;
     }
 
     public static Transform GetClosestPlayerTransform(Vector3 position)
@@ -198,6 +202,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         LanRunStatsSnapshot stats = GetOrCreateServerStats(killerClientId);
         stats.RegisterKill(enemyType, xpGained);
         s_serverRunStats[killerClientId] = stats;
+        ServerBroadcastLiveStats(killerClientId);
     }
 
     public static void ServerRecordPickup(ulong collectorClientId, LanPickupType pickupType, int xpAmount = 0)
@@ -314,6 +319,128 @@ public class LanPlayerAvatar : NetworkBehaviour
         return stats;
     }
 
+    private static void ServerBroadcastLiveStats(ulong clientId)
+    {
+        if (!LanRuntime.IsServer || clientId == ulong.MaxValue)
+            return;
+
+        bool isConnected = IsClientConnectedOnServer(clientId);
+        LanLiveStatsEntry entry = BuildServerLiveStatsEntry(clientId, isConnected);
+        ApplyLiveStatsEntry(entry);
+
+        LanPlayerAvatar broadcaster = GetAuthorityAvatar() ?? GetAvatarByClientId(clientId);
+        if (broadcaster != null)
+            broadcaster.ReceiveLiveStatsClientRpc(entry);
+    }
+
+    private static void ServerBroadcastAllLiveStats()
+    {
+        if (!LanRuntime.IsServer)
+            return;
+
+        foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
+        {
+            if (lanPlayer == null)
+                continue;
+
+            if (!IsClientConnectedOnServer(lanPlayer.OwnerClientId))
+                continue;
+
+            GetOrCreateServerStats(lanPlayer.OwnerClientId);
+            ServerBroadcastLiveStats(lanPlayer.OwnerClientId);
+        }
+    }
+
+    private static void ServerRemoveLiveStats(ulong clientId)
+    {
+        if (!LanRuntime.IsServer || clientId == ulong.MaxValue)
+            return;
+
+        LanLiveStatsEntry entry = new LanLiveStatsEntry
+        {
+            clientId = clientId,
+            playerName = NormalizePlayerName($"Player {clientId}"),
+            killsThisRun = 0,
+            isConnected = false
+        };
+
+        s_serverRunStats.Remove(clientId);
+        ApplyLiveStatsEntry(entry);
+
+        LanPlayerAvatar broadcaster = GetAuthorityAvatar();
+        if (broadcaster != null)
+            broadcaster.ReceiveLiveStatsClientRpc(entry);
+    }
+
+    private static LanLiveStatsEntry BuildServerLiveStatsEntry(ulong clientId, bool isConnected)
+    {
+        LanRunStatsSnapshot stats = GetOrCreateServerStats(clientId);
+        return new LanLiveStatsEntry
+        {
+            clientId = clientId,
+            playerName = GetServerLivePlayerName(clientId),
+            killsThisRun = stats.killsThisRun,
+            isConnected = isConnected
+        };
+    }
+
+    private static FixedString64Bytes GetServerLivePlayerName(ulong clientId)
+    {
+        LanPlayerAvatar avatar = GetAvatarByClientId(clientId);
+        if (avatar != null)
+        {
+            string syncedName = avatar.syncedPlayerName.Value.ToString();
+            if (!string.IsNullOrWhiteSpace(syncedName))
+                return NormalizePlayerName(syncedName);
+        }
+
+        return NormalizePlayerName($"Player {clientId}");
+    }
+
+    private static bool IsClientConnectedOnServer(ulong clientId)
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || !networkManager.IsServer)
+            return true;
+
+        if (clientId == Unity.Netcode.NetworkManager.ServerClientId)
+            return true;
+
+        IReadOnlyList<ulong> connectedClientIds = networkManager.ConnectedClientsIds;
+        for (int i = 0; i < connectedClientIds.Count; i++)
+        {
+            if (connectedClientIds[i] == clientId)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void ApplyLiveStatsEntry(LanLiveStatsEntry entry)
+    {
+        if (entry.clientId == ulong.MaxValue)
+            return;
+
+        if (entry.isConnected)
+            s_liveStats[entry.clientId] = entry;
+        else
+            s_liveStats.Remove(entry.clientId);
+
+        RebuildLiveStatsSnapshot();
+    }
+
+    private static void RebuildLiveStatsSnapshot()
+    {
+        s_liveStatsSnapshot.Clear();
+        foreach (LanLiveStatsEntry entry in s_liveStats.Values)
+        {
+            if (entry.isConnected)
+                s_liveStatsSnapshot.Add(entry);
+        }
+
+        OnLiveStatsChanged?.Invoke(s_liveStatsSnapshot);
+    }
+
     private static bool HasLivingPlayers()
     {
         foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
@@ -372,6 +499,8 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         syncedPlayerName.Value = NormalizePlayerName(playerName.ToString());
         ApplyPlayerName(syncedPlayerName.Value);
+        ApplyPlayerNameClientRpc(syncedPlayerName.Value);
+        ServerBroadcastLiveStats(OwnerClientId);
     }
 
     [ServerRpc]
@@ -387,16 +516,27 @@ public class LanPlayerAvatar : NetworkBehaviour
 
     private void ApplyPlayerName(FixedString64Bytes playerName)
     {
-        EnsureNameTag();
-
-        if (nameTagText == null)
-            return;
-
         string displayName = playerName.ToString();
         if (string.IsNullOrWhiteSpace(displayName))
             displayName = $"Player {OwnerClientId}";
 
-        nameTagText.text = displayName;
+        if (playerIdentity != null)
+        {
+            playerIdentity.EnsureNameTagReady();
+            playerIdentity.SetDisplayName(displayName);
+        }
+    }
+
+    [ClientRpc]
+    private void ApplyPlayerNameClientRpc(FixedString64Bytes playerName)
+    {
+        ApplyPlayerName(playerName);
+    }
+
+    [ClientRpc]
+    private void ReceiveLiveStatsClientRpc(LanLiveStatsEntry entry)
+    {
+        ApplyLiveStatsEntry(entry);
     }
 
     private void Awake()
@@ -408,12 +548,21 @@ public class LanPlayerAvatar : NetworkBehaviour
         dash = GetComponent<DashChargesEffect>();
         buffManager = GetComponent<BuffManager>();
         skinApplier = GetComponent<PlayerSkinApplier>();
+        playerIdentity = GetComponent<PlayerIdentity>();
+        if (playerIdentity == null)
+            playerIdentity = gameObject.AddComponent<PlayerIdentity>();
+
+        if (playerIdentity != null)
+        {
+            playerIdentity.SetApplySavedNameOnStart(false);
+            playerIdentity.EnsureNameTagReady();
+        }
+
         if (skinApplier != null)
             skinApplier.SetApplySavedSkinOnStart(false);
         rb = GetComponent<Rigidbody2D>();
         bodyRenderer = GetComponent<SpriteRenderer>();
         bodyColliders = GetComponents<Collider2D>();
-        EnsureNameTag();
 
         if (health != null)
             health.OnDeath.AddListener(HandleLocalDeath);
@@ -448,10 +597,17 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         if (IsServer)
         {
-            EnsureServerStatsEntry();
-
+            bool initializedMatch = false;
             if (SceneManager.GetActiveScene().name == GameplaySceneName && IsAuthorityAvatar)
+            {
                 InitializeServerMatchState();
+                initializedMatch = true;
+            }
+
+            EnsureServerStatsEntry();
+            ServerBroadcastLiveStats(OwnerClientId);
+            if (!initializedMatch)
+                ServerBroadcastAllLiveStats();
 
             Vector3 spawnPosition = GetSpawnPosition(OwnerClientId);
             transform.position = spawnPosition;
@@ -807,15 +963,6 @@ public class LanPlayerAvatar : NetworkBehaviour
         RequestFireServerRpc(localShotSequence, position, rotation);
     }
 
-    private void LateUpdate()
-    {
-        if (nameTagTransform == null)
-            return;
-
-        nameTagTransform.position = transform.position + Vector3.up * NameTagWorldOffsetY;
-        nameTagTransform.rotation = Quaternion.identity;
-    }
-
     private void CleanupPredictedShots()
     {
         if (predictedShots.Count == 0)
@@ -941,10 +1088,15 @@ public class LanPlayerAvatar : NetworkBehaviour
     private void InitializeServerMatchState()
     {
         s_serverRunStats.Clear();
+        s_liveStats.Clear();
+        s_liveStatsSnapshot.Clear();
         foreach (LanPlayerAvatar lanPlayer in s_activePlayers)
         {
-            if (lanPlayer != null)
+            if (lanPlayer != null && IsClientConnectedOnServer(lanPlayer.OwnerClientId))
+            {
                 s_serverRunStats[lanPlayer.OwnerClientId] = default;
+                ApplyLiveStatsEntry(BuildServerLiveStatsEntry(lanPlayer.OwnerClientId, isConnected: true));
+            }
         }
 
         s_serverMatchEnded = false;
@@ -954,6 +1106,7 @@ public class LanPlayerAvatar : NetworkBehaviour
         syncedMatchEnded.Value = false;
         syncedWave.Value = 0;
         ApplyReplicatedWave(0);
+        ServerBroadcastAllLiveStats();
     }
 
     private void HandleLocalDeath()
@@ -982,36 +1135,6 @@ public class LanPlayerAvatar : NetworkBehaviour
 
         if (IsServer)
             ServerHandlePlayerDeath(this);
-    }
-
-    private void EnsureNameTag()
-    {
-        if (nameTagText != null)
-            return;
-
-        TextMeshPro existingNameTag = GetComponentInChildren<TextMeshPro>(true);
-        if (existingNameTag != null && existingNameTag.gameObject.name == "PlayerNameText")
-        {
-            nameTagText = existingNameTag;
-            nameTagTransform = existingNameTag.transform;
-            return;
-        }
-
-        GameObject nameTag = new GameObject("PlayerNameText");
-        nameTag.layer = gameObject.layer;
-        nameTagTransform = nameTag.transform;
-        nameTagTransform.SetParent(transform, false);
-
-        TextMeshPro text = nameTag.AddComponent<TextMeshPro>();
-        text.alignment = TextAlignmentOptions.Center;
-        text.fontSize = 1.2f;
-        text.fontStyle = FontStyles.Bold;
-        text.enableWordWrapping = false;
-        text.color = Color.white;
-        text.sortingOrder = 50;
-        text.rectTransform.sizeDelta = new Vector2(6f, 1.5f);
-
-        nameTagText = text;
     }
 
     private static FixedString64Bytes GetLocalPlayerName()
@@ -1188,8 +1311,8 @@ public class LanPlayerAvatar : NetworkBehaviour
             }
         }
 
-        if (nameTagText != null)
-            nameTagText.gameObject.SetActive(alive);
+        if (playerIdentity != null)
+            playerIdentity.SetVisible(alive);
 
         if (rb != null)
         {
@@ -1224,6 +1347,12 @@ public class LanPlayerAvatar : NetworkBehaviour
                     rb.position = spawnPosition;
             }
 
+            if (playerIdentity != null)
+                playerIdentity.EnsureNameTagReady();
+
+            ApplyPlayerName(syncedPlayerName.Value);
+            SetAlivePresentation(!syncedDead.Value);
+
             if (IsOwner)
                 StartCoroutine(BindLocalSceneReferencesRoutine());
 
@@ -1244,6 +1373,9 @@ public class LanPlayerAvatar : NetworkBehaviour
         NetworkManager networkManager = NetworkManager.Singleton;
         if (!IsOwner || networkManager == null)
             return;
+
+        if (networkManager.IsServer && clientId != networkManager.LocalClientId)
+            ServerRemoveLiveStats(clientId);
 
         if (!networkManager.IsServer && clientId == networkManager.LocalClientId)
             LanSessionLifecycle.ExitToLobby();
