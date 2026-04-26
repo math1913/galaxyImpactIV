@@ -183,8 +183,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   nameTagText: {fileID: 155139203}
   applySavedNameOnStart: 0
+  showHealthBarInLanOnly: 1
+  forceShowHealthBarForTesting: 0
   fallbackName: Jugador
   nameWorldOffset: {x: 0, y: 1.35, z: 0}
+  healthBarWorldOffset: {x: 0, y: 0.92, z: 0}
+  healthBarSize: {x: 1.55, y: 0.2}
 --- !u!114 &155139150
 MonoBehaviour:
   m_ObjectHideFlags: 0
