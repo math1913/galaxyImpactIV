@@ -4,7 +4,7 @@ using UnityEngine;
 public class PlayerTuningProfile : ScriptableObject
 {
     [Header("Movement")]
-    [Min(0f)] public float moveSpeed = 3f;
+    [Min(0f)] public float moveSpeed = 3.6f;
     [Min(0f)] public float acceleration = 40f;
     [Min(0f)] public float deceleration = 40f;
     [Min(0f)] public float movementMargin = 3f;
@@ -20,7 +20,7 @@ public class PlayerTuningProfile : ScriptableObject
 
     [Header("Weapon")]
     [Min(0.01f)] public float fireRate = 3f;
-    [Min(1)] public int magazineSize = 30;
+    [Min(1)] public int magazineSize = 45;
     [Min(0f)] public float reloadTime = 1.6f;
     [Range(0f, 8f)] public float spreadDeg = 0.5f;
     [Min(0)] public int totalAmmo = int.MaxValue;

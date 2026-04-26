@@ -228,7 +228,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ecb25e78614f394a8f4d72e38ae169c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 3
+  moveSpeed: 3.6
   acceleration: 40
   deceleration: 40
   cam: {fileID: 0}
@@ -450,7 +450,7 @@ MonoBehaviour:
   bulletPrefab: {fileID: 2955812645416493260, guid: 86282a3c9bfb6744399e5e521fb3b9d5, type: 3}
   bulletPool: {fileID: 0}
   fireRate: 3
-  magazineSize: 30
+  magazineSize: 45
   reloadTime: 1.6
   spreadDeg: 0.5
   automaticFire: 0

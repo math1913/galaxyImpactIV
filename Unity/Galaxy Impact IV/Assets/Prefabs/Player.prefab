@@ -42,17 +42,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 131b062dacf00ac48a42a3e54e9a4ff5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   muzzle: {fileID: 2111020379090157357}
   bulletPrefab: {fileID: 2955812645416493260, guid: 86282a3c9bfb6744399e5e521fb3b9d5, type: 3}
   bulletPool: {fileID: 0}
-  fireRate: 3
-  magazineSize: 30
+  fireRate: 4
+  magazineSize: 45
   reloadTime: 1.6
   spreadDeg: 0.5
   automaticFire: 0
-  autoReload: 0
+  autoReload: 1
   shootSfx: {fileID: 8300000, guid: b68ca824aec402f4eba8694c79d3ffec, type: 3}
   reloadStartSfx: {fileID: 8300000, guid: 831a4e19da6bde142902f5c70fee2963, type: 3}
   reloadCompleteSfx: {fileID: 0}
@@ -202,6 +202,7 @@ MonoBehaviour:
   nameTagText: {fileID: 456466382201880457}
   applySavedNameOnStart: 1
   fallbackName: Jugador
+  nameWorldOffset: {x: 0, y: 1.35, z: 0}
 --- !u!114 &867530900100000004
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -328,13 +329,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3ecb25e78614f394a8f4d72e38ae169c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeed: 3
+  moveSpeed: 3.6
   acceleration: 40
   deceleration: 40
+  speedMultiplier: 1
+  margin: 3
   cam: {fileID: 0}
   background: {fileID: 0}
-  margin: 3
-  speedMultiplier: 1
 --- !u!114 &7758100008095657330
 MonoBehaviour:
   m_ObjectHideFlags: 0

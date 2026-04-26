@@ -70,6 +70,10 @@ public class LanLobbySkinPreviewHUD : MonoBehaviour
 
     [Header("Player Slots")]
     [SerializeField] private SlotLayout[] slotLayouts = CreateDefaultLayouts();
+    [Tooltip("Escala extra solo para la skin default del lobby preview. Usa menos de 1 si se ve mas grande que las demas.")]
+    [SerializeField, Range(0.5f, 1.2f)] private float defaultLobbySkinScale = 0.60f;
+    [Tooltip("Offset extra solo para la skin default del lobby preview. X positivo mueve a la derecha, Y negativo baja.")]
+    [SerializeField] private Vector2 defaultLobbySkinPositionOffset = new Vector2(12f, -35f);
     [SerializeField] private bool showEditorPreview = true;
     [SerializeField] private float refreshInterval = 0.15f;
 
@@ -314,8 +318,8 @@ public class LanLobbySkinPreviewHUD : MonoBehaviour
         if (view.skinImage != null)
         {
             RectTransform skinRect = view.skinImage.rectTransform;
-            skinRect.anchoredPosition = layout.skinPosition;
-            skinRect.sizeDelta = SizeOrFallback(layout.skinSize, new Vector2(240f, 360f));
+            skinRect.anchoredPosition = GetSlotSkinPosition(layout, preview.skinIndex);
+            skinRect.sizeDelta = GetSlotSkinSize(layout, preview.skinIndex);
             view.skinImage.sprite = visible ? GetLobbySkinSprite(preview.skinIndex) : null;
             view.skinImage.enabled = visible && view.skinImage.sprite != null;
             view.skinImage.preserveAspect = true;
@@ -545,6 +549,23 @@ public class LanLobbySkinPreviewHUD : MonoBehaviour
         text.color = Color.white;
         text.fontStyle = FontStyles.Bold;
         return text;
+    }
+
+    private Vector2 GetSlotSkinSize(SlotLayout layout, int skinIndex)
+    {
+        Vector2 baseSize = SizeOrFallback(layout.skinSize, new Vector2(240f, 360f));
+        if (PlayerSkinProfile.NormalizeSkinIndex(skinIndex) != 0)
+            return baseSize;
+
+        return baseSize * Mathf.Max(0.1f, defaultLobbySkinScale);
+    }
+
+    private Vector2 GetSlotSkinPosition(SlotLayout layout, int skinIndex)
+    {
+        if (PlayerSkinProfile.NormalizeSkinIndex(skinIndex) != 0)
+            return layout.skinPosition;
+
+        return layout.skinPosition + defaultLobbySkinPositionOffset;
     }
 
     private Sprite GetLobbySkinSprite(int skinIndex)

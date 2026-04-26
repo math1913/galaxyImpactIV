@@ -917,13 +917,15 @@ MonoBehaviour:
   playerStatsPanel: {fileID: 1703920631}
   skinPreviewImage: {fileID: 2080396070}
   skinPreviewBackgroundSprite: {fileID: 4221179165433377106, guid: 25fa8ec98abb1034fb5be336bcfec80c, type: 3}
-  defaultLobbySprite: {fileID: 0}
+  defaultLobbySprite: {fileID: -3952219135121026657, guid: 698c1f7787e5a384c86943d3906bbed4, type: 3}
   mateoLobbySprite: {fileID: 7703142897341082002, guid: a740b169d6b046eaa60aa4b5ff51bd59, type: 3}
   ericLobbySprite: {fileID: 4504640945755876231, guid: d64b50f47452fe14db595dcceb68a89f, type: 3}
   ignasiLobbySprite: {fileID: 6612237982264531001, guid: 9af2c799ef114394cb62df77fdd75b24, type: 3}
   skinPreviewFrameSize: {x: 840, y: 560}
   skinPreviewFramePosition: {x: 0, y: -400}
   skinPreviewImageSize: {x: 460, y: 530}
+  defaultLobbySkinScale: 0.60
+  defaultLobbySkinPositionOffset: {x: 12, y: -35}
   skinPreviewImagePosition: {x: 0, y: 10}
   statsPanelSize: {x: 840, y: 175}
   statsPanelPosition: {x: 0, y: 250}
