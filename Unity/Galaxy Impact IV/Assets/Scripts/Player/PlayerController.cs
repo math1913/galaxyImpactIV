@@ -150,6 +150,14 @@ public class PlayerController : MonoBehaviour
         speedMultiplier /= multiplier;
     }
 
+    public void ApplyTuning(float tunedMoveSpeed, float tunedAcceleration, float tunedDeceleration, float tunedMargin)
+    {
+        moveSpeed = Mathf.Max(0f, tunedMoveSpeed);
+        acceleration = Mathf.Max(0f, tunedAcceleration);
+        deceleration = Mathf.Max(0f, tunedDeceleration);
+        margin = Mathf.Max(0f, tunedMargin);
+    }
+
     public void SetOverrideVelocity(Vector2 velocity)
     {
         _overrideVelocityActive = true;
