@@ -1141,19 +1141,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 803846491}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 2088655622}
-        m_TargetAssemblyTypeName: LanSessionUI, Assembly-CSharp
-        m_MethodName: StartMatch
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &803846491
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4036,6 +4024,9 @@ MonoBehaviour:
   hostButton: {fileID: 887012336}
   joinButton: {fileID: 1795398206}
   startMatchButton: {fileID: 803846490}
+  startMatchButtonLabel: {fileID: 134025236}
+  startMatchButtonText: Start
+  backToMenuButtonText: Back to Menu
   exitButton: {fileID: 1462628354}
   exitButtonLabel: {fileID: 611320020}
   statusText: {fileID: 1095336709}
@@ -4043,6 +4034,7 @@ MonoBehaviour:
   clientsText: {fileID: 1824485372}
   lobbySceneName: Lobby
   gameSceneName: GameScene
+  mainMenuSceneName: MainMenu
 --- !u!114 &2088655623
 MonoBehaviour:
   m_ObjectHideFlags: 0
